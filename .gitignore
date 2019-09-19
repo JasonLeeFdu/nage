@@ -1,0 +1,8 @@
+Datasets
+LOGS/
+model/
+log/
+rawResearch/
+NetBricks/
+__pycache__/
+.idea/
