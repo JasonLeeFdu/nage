@@ -82,7 +82,7 @@ def train():
         logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis = LjchCNN(image,trainSwitch)
         networkLoss = lossFunc(logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, label, clsLabel)
         # loadPretrainedResnetVGG19(sess)
-        loadPretrainedResnetVGG19(sess)
+        # loadPretrainedResnetVGG19(sess)
 
 
 
