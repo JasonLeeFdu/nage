@@ -274,7 +274,7 @@ class ResNet(object):
         print("test_accuracy: {}".format(test_accuracy))
 
 
-def getRes18V1(inp, num_class, is_training=True, reuse=False):
+def getRes18(inp, num_class, is_training=True, reuse=False):
     with tf.variable_scope("Resnet", reuse=reuse):
         residual_block = resblock
         residual_list = get_residual_layer(18)

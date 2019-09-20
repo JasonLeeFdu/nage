@@ -6,12 +6,18 @@ from thop import  profile
 
 
 def securePath(path):
-    if not os.path.exists(path):
-        os.mkdir(path)
+    pathList = list()
+    while not os.path.exists(path):
+        pathList.append(path)
+        path = os.path.dirname(path)
+    pathList.reverse()
+    for elem in pathList:
+        os.mkdir(elem)
     return
 
+
+
 def secureSoftLink(src,dst):
-    ## src dst
     if not os.path.exists(dst):
         os.symlink(src,dst)
     return

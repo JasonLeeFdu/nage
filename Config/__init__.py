@@ -1,6 +1,10 @@
 import os
 import random
 
+# For Training
+MODEL_Name = 'Resnet18MapScore_20190920'
+
+
 
 _PROJECT_BASEPATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASETS_PATH = os.path.join(_PROJECT_BASEPATH,'Datasets','Neijing/blendDS')
@@ -8,7 +12,8 @@ DATASETS_TRAIN_PATH = os.path.join(DATASETS_PATH,'train')
 DATASETS_VAL_PATH = os.path.join(DATASETS_PATH,'val')
 TRAIN_FN = os.path.join(DATASETS_PATH, 'Train.tfrecord')
 VAL_FN = os.path.join(DATASETS_PATH, 'Val.tfrecord')
-
+PRETRAINED_VGG19 = os.path.join(_PROJECT_BASEPATH,'/pretrainedMod/vgg_19.ckpt')
+PRETRAINED_Resnet50 = os.path.join(_PROJECT_BASEPATH,'/pretrainedMod/resnet_v2_50.ckpt')
 
 
 
@@ -20,17 +25,8 @@ STD_INPUT_H = 224
 STD_INPUT_W = 224
 
 
-
-
-
-
-
-
-
-
-# For Training
-MODEL_PATH = os.path.join(_PROJECT_BASEPATH,'model','Neijing')
-LOG_PATH = os.path.join(_PROJECT_BASEPATH,'log')
+MODEL_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','model') % MODEL_Name
+LOG_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','log') % MODEL_Name
 
 
 NUM_WORKERS = 3
@@ -66,6 +62,8 @@ WEIGHT_INIT_STDDEV_FACTOR = 1.3                # big
 WEIGHT_INIT_MEAN_FACTOR = 0
 SUMMARY_SCALAR_FIX  = 3e-3
 GRADIENT_CLIP_THETA = 0.1
+
+
 
 ## 模型测试
 # TEST_MODEL_PATH = '/home/winston/workSpace/PycharmProjects/Foundation/AutoEncoder/testModels'

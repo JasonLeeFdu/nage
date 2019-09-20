@@ -27,7 +27,6 @@ from resTool.ResNetGen import *
 slim = tf.contrib.slim
 dbgList = list()
 
-
 def ConvLayer(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='Conv2d'):
     with tf.name_scope(name):
         weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
@@ -46,7 +45,6 @@ def ConvLayerD(inp,h,w,inc,outc,training,dilated = [1,1,1,1],padding='SAME',stri
         out    = tf.nn.relu(out)
     return out
 
-
 def ConvLayerNoRELU(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='Conv2d'):
     with tf.name_scope(name):
         weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
@@ -54,7 +52,6 @@ def ConvLayerNoRELU(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],n
         out    = tf.nn.conv2d(inp,weight,padding=padding,name='conv',strides=strides) + bias
         out = tf.layers.batch_normalization(out, training=training)
     return out
-
 
 def bridgeConv1(inp,training,name='BridgeConv1'):
     with tf.name_scope(name):
@@ -152,7 +149,7 @@ def ResNet50Eye(inp,trainingFlag):
             tf.summary.histogram('resnet_v2_50/logits/bias',dg.get_tensor_by_name('resnet_v2_50/logits/biases:0'))
         return logits_28,logits_56,logits_112,logits_224,logitsClass,predFlat,predCls,predVis
 
-###
+### 实验版
 def vgg19Eye(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
         resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=conf.FIANL_CLASSES_NUM,is_training=trainingFlag)
@@ -213,9 +210,9 @@ def vgg19Eye(inp, trainingFlag):
         return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
-###
-def ResNet18EyeV1(inp, trainingFlag):
-    endPoints = getRes18V1(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
+### 测试版v1 2019年9月20号周五
+def ResNet18Eyev1(inp, trainingFlag):
+    endPoints = getRes18(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
     L224 = endPoints['L224']
     L112 = endPoints['L112']
     L56 = endPoints['L56']
@@ -270,7 +267,7 @@ def ResNet18EyeV1(inp, trainingFlag):
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
-###
+### 实验版
 def vgg16Eye(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
         resnet50, endPoints = nets.vgg.vgg_16(inp,num_classes=conf.FIANL_CLASSES_NUM,is_training=trainingFlag)
@@ -336,20 +333,13 @@ def vgg16Eye(inp, trainingFlag):
 
 
 
-def clipSmall(logits):
-    posLo = tf.cast(logits >= 0,tf.float32)
-    negLo = tf.cast(logits < 0,tf.float32)
-    posPart = posLo * logits
-    negPart = negLo * logits
-    posGood = tf.clip_by_value(posPart,1e-10,10)
-    negGood = tf.clip_by_value(negPart,-10,-(1e-10))
-
-    return posGood + negGood
 
 
+'''
+以下是损失函数类
 
 
-
+'''
 def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,gtImg,gtLb):
     # gtImg  [None,224,224,numClass];   gtLb [None,Numclass]
     ######################logits_28, logits_56, logits_112, logits_224, logitsClass, label, clsLabel)
@@ -416,8 +406,6 @@ def loadPretrainedResnet50(sess):
     saver.restore(sess, 'model/pretrained/resnet_v2_50.ckpt')
     print('Pretrained Loaded')
 
-
-
 def loadPretrainedResnetVGG19(sess):
     vgg_var_list = tf.global_variables('vgg_19')
     vgg_var_list = vgg_var_list[:-2]
@@ -425,27 +413,27 @@ def loadPretrainedResnetVGG19(sess):
     saver.restore(sess, 'model/pretrained/vgg_19.ckpt')
     print('Pretrained Loaded')
 
+def clipSmall(logits):
+    posLo = tf.cast(logits >= 0,tf.float32)
+    negLo = tf.cast(logits < 0,tf.float32)
+    posPart = posLo * logits
+    negPart = negLo * logits
+    posGood = tf.clip_by_value(posPart,1e-10,10)
+    negGood = tf.clip_by_value(negPart,-10,-(1e-10))
+
+    return posGood + negGood
+
+def focalLossMap(output, label):
+    '''
+    :param output:[None,H,W,conf.TOTAL_CLS]
+    :param label:[[None,H,W,conf.TOTAL_CLS]]
+    :return:[]
+    '''
 
 
-LjchCNN = ResNet18EyeV1
-backbone_name = 'resnet18' #'resnet18'
+    return tf.reduce_sum(output)
 
-
-
-
-
-def focal_loss(output, label):
-    label = tf.cast(tf.greater(label, 0.5), tf.float32)
-    p = tf.sigmoid(output)
-    pos_p = tf.multiply(p, label)
-    neg_p = tf.multiply((1.0 - p), (1.0 - label))
-    sum_p = pos_p + neg_p
-    final_p = tf.clip_by_value(sum_p, 1e-12, (1.0 - 1e-12))
-    final_log = tf.multiply(-1.0, tf.log(final_p))
-    final_loss = tf.multiply(0.25, tf.multiply((1.0 - final_p) ** 2, final_log))
-    return tf.reduce_sum(final_loss)
-
-def focal_loss_class_balanced(output, label):
+def focalLossCls(output, label):
     label = tf.cast(tf.greater(label, 0.5), tf.float32)
 
     num_labels_pos = tf.reduce_sum(label)
@@ -462,16 +450,13 @@ def focal_loss_class_balanced(output, label):
     pos_loss = tf.multiply(tf.multiply(-1.0, tf.log(pos_p)), label)
     neg_loss = tf.multiply(tf.multiply(-1.0, tf.log(neg_p)), (1.0 - label))
 
-    # neg_ratio = tf.cond(num_labels_pos > 0.0, lambda: num_labels_pos / num_total, lambda: 0.5)
-    # pos_ratio = tf.cond(num_labels_neg > 0.0, lambda: num_labels_neg / num_total, lambda: 0.5)
+
     pos_ratio = num_labels_neg / num_total
     neg_ratio = num_labels_pos / num_total
     sum_loss = pos_ratio * pos_loss + neg_ratio * neg_loss
 
     final_loss = tf.multiply((1.0 - final_p) ** 2, sum_loss)
     return tf.reduce_sum(final_loss)
-
-
 
 def main():
     g = tf.Graph()
@@ -510,6 +495,8 @@ if __name__ == '__main__':
 
 
 
+LjchCNN = ResNet18Eyev1
+backbone_name = 'resnet18' #'resnet18'
 
 
 
