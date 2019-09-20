@@ -2,7 +2,7 @@ import os
 import random
 
 # For Training
-MODEL_Name = 'Resnet18MapScore_20190920_Gaijin3'
+MODEL_Name = 'Resnet18X64_CLS_20190920'
 
 
 

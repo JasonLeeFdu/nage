@@ -379,3 +379,46 @@ def getRes18(inp, num_class, is_training=True, reuse=False):
         endPoints['logitFinal']  = logitFinal
 
         return endPoints
+
+
+def getRes18Cls(inp, num_class, is_training=True):
+    residual_block = resblock
+    residual_list = get_residual_layer(18)
+    ch = 64
+    x = conv(inp, channels=ch, kernel=3, stride=1, scope='conv')
+
+    for i in range(residual_list[0]):
+        x = residual_block(x, channels=ch, is_training=is_training, downsample=False, scope='resblock0_' + str(i))
+
+    ########################################################################################################
+
+    x = residual_block(x, channels=ch * 2, is_training=is_training, downsample=True, scope='resblock1_0')
+
+    for i in range(1, residual_list[1]):
+        x = residual_block(x, channels=ch * 2, is_training=is_training, downsample=False, scope='resblock1_' + str(i))
+
+    ########################################################################################################
+
+    x = residual_block(x, channels=ch * 4, is_training=is_training, downsample=True, scope='resblock2_0')
+
+    for i in range(1, residual_list[2]):
+        x = residual_block(x, channels=ch * 4, is_training=is_training, downsample=False, scope='resblock2_' + str(i))
+
+    ########################################################################################################
+
+    x = residual_block(x, channels=ch * 8, is_training=is_training, downsample=True, scope='resblock_3_0')
+
+    for i in range(1, residual_list[3]):
+        x = residual_block(x, channels=ch * 8, is_training=is_training, downsample=True, scope='resblock_3_' + str(i))
+
+    ########################################################################################################
+
+    x = batch_norm(x, is_training, scope='batch_norm')
+    x = relu(x)
+    x = conv(x,channels=ch*32,3,1)
+    x = batch_norm(x, is_training, scope='batch_norm')
+    x = relu(x)
+    x = global_avg_pooling(x)
+    x = fully_conneted(x, units=num_class, scope='logit')
+
+    return x
