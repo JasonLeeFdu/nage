@@ -1,7 +1,6 @@
-Datasets
+Datasets/
 LOGS/
-model/
-log/
+Model/
 rawResearch/
 NetBricks/
 __pycache__/
