@@ -2,7 +2,7 @@ import os
 import random
 
 # For Training
-MODEL_Name = 'Resnet18MapScore_20190920'
+MODEL_Name = 'Resnet18MapScore_20190920_Gaijin3'
 
 
 
@@ -40,7 +40,7 @@ GPU_FLAG = True
 GPUS = 0
 SEED = random.randint(1, 900000)
 LR_INTERVAL = 50000
-WEIGHT_DECAY= 3.3e-4# 1e-3 #0.000000
+WEIGHT_DECAY= 5e-4# 1e-3 #0.000000
 MOMENTUM = 0.9
 PRELOAD = False
 
