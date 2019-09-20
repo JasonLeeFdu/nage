@@ -1,8 +1,9 @@
 Datasets/
-LOGS/
 Model/
+log/
 rawResearch/
 NetBricks/
 __pycache__/
 .idea/
 pretrainedMod/
+Config/__pycache__

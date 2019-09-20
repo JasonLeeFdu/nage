@@ -80,14 +80,12 @@ def train():
 
         # 构建网络
         logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis = LjchCNN(image,trainSwitch)
-        networkLoss = lossFunc(logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, label, clsLabel)
+        networkLoss = lossFunc(logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, label, clsLabel, predVis)
         # loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
-
-
 
         # 正则化项
-        if backbone_name != 'resnet18':
+        if backbone_name != 'resnet18':  #正常流程
             weights_var = tf.trainable_variables()
             weights_var_withoutNorm = [x for x in weights_var if
                                        ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
@@ -95,6 +93,7 @@ def train():
                 weights_var_withoutNorm)
 
         else:
+            # 单独处理vgg
             weights_var = tf.trainable_variables()
             weights_var_withoutNorm = [x for x in weights_var if
                                        ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
@@ -116,9 +115,8 @@ def train():
         tf.summary.image("label",tf.expand_dims(label[:,:,:,1],axis=-1))
         tf.summary.image("predVis(C1)",tf.expand_dims(predVis,axis=-1))
 
-        tf.summary.scalar("Loss", loss)
-        tf.summary.scalar("networkLoss", networkLoss)
-        tf.summary.scalar("l2NormLoss", l2NormLoss)
+        tf.summary.scalar("Loss(networkAndL2)", loss)
+
 
 
         # 全局训练次数

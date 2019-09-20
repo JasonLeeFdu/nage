@@ -59,14 +59,103 @@ def bridgeConv1(inp,training,name='BridgeConv1'):
     return l2
 
 
-'''
-def bridgeOri(inp,training,name='BridgeOri'):
-    with tf.name_scope(name):
-        l1 = ConvLayer(inp,3,3,3,32,training,name='Conv1')
-        l2 = ConvLayer(l1,3,3,32,32,training,name='Conv2')
-        l3 = ConvLayer(l2,3,3,32,32,training,name='Conv3')
-    return l3 + l1
-'''
+# 数量平衡过的二分类focalLoss，效果还不错
+def focalLossBalanced(outputLogits, label):
+
+    label = tf.cast(tf.greater(label, 0.5), tf.float32)
+
+    num_labels_pos = tf.reduce_sum(label)
+    num_labels_neg = tf.reduce_sum(1.0 - label)
+    num_total = num_labels_pos + num_labels_neg
+
+    p = tf.sigmoid(outputLogits)
+    # p = output
+    pos = tf.multiply(p, label)
+    neg = tf.multiply((1.0 - p), (1.0 - label))
+    final_p = pos + neg
+    pos_p = tf.clip_by_value(pos, 1e-12, (1.0 - 1e-12))
+    neg_p = tf.clip_by_value(neg, 1e-12, (1.0 - 1e-12))
+
+    pos_loss = tf.multiply(tf.multiply(-1.0, tf.log(pos_p)), label)
+    neg_loss = tf.multiply(tf.multiply(-1.0, tf.log(neg_p)), (1.0 - label))
+
+    pos_ratio = num_labels_neg / num_total
+    neg_ratio = num_labels_pos / num_total
+    sum_loss = pos_ratio * pos_loss + neg_ratio * neg_loss
+
+    final_loss = tf.multiply((1.0 - final_p) ** 2, sum_loss)
+    return tf.reduce_sum(final_loss)
+
+# 传统二分类focalLoss
+def focalLoss(outputLogits, label):
+    label = tf.cast(tf.greater(label, 0.5), tf.float32)
+    p = tf.nn.sigmoid(outputLogits)
+    pos_p = tf.multiply(p, label)
+    neg_p = tf.multiply((1.0 - p), (1.0 - label))
+    sum_p = pos_p + neg_p
+    final_p = tf.clip_by_value(sum_p, 1e-12, (1.0 - 1e-12))
+    final_log = tf.multiply(-1.0, tf.log(final_p))
+    final_loss = tf.multiply(0.25, tf.multiply((1.0 - final_p) ** 2, final_log))
+    return tf.reduce_sum(final_loss)
+
+# 多分类FocalLoss,效果为止
+def focalLossMultiCls(outputLogits, label):
+    '''
+    Focal loss for multi-class softmax
+    :param outputLogits:[None,H,W,conf.FIANL_CLASSES_NUM]  (?, 224, 224, 5)
+    :param label:[[None,H,W,conf.FIANL_CLASSES_NUM]]  (?, 224, 224, 5)
+    :return: 鉴于多分类问题比较复杂，不敢使用。可以等待有成熟的模型之后，再做测试。因为之前的字符串识别效果并不好，而且网站上别人说效果未必好。
+
+    '''
+    ALPHA = 4
+    GAMMA = 2
+    label = tf.cast(tf.greater(label, 0.5), tf.float32)
+
+    outputP = tf.nn.softmax(outputLogits,axis=3)
+
+    pos_p = tf.multiply(outputP, label)
+
+    clippedP = tf.clip_by_value(pos_p, 1e-14, (1.0 - 1e-14))
+
+    alphaP = label * ALPHA
+
+    res = -alphaP * tf.pow((1.0-clippedP),GAMMA) * tf.log(clippedP)
+
+    return tf.reduce_sum(res) / tf.reduce_sum(label)
+
+
+# 计算 IOU,[None,H,W] 取值范围{0,1}
+def IOU(pred,gt):
+    H = pred.get_shape().as_list()[1]
+    W = pred.get_shape().as_list()[2]
+    flat_logits = tf.reshape(pred,[-1,H * W])
+    flat_labels = tf.reshape(gt,[-1,H * W])
+    intersection = tf.reduce_sum(flat_logits * flat_labels,axis=1) #沿着第一维相乘求和
+    denominator = tf.reduce_sum(flat_logits,axis=1) + tf.reduce_sum(flat_labels,axis=1) - intersection
+    iou = tf.reduce_mean((intersection + 1e-7) / (denominator + 1e-7))
+    return iou
+
+
+
+# 计算 每张图的像素的准确度,输入为one-hot 4D [None,H,W] 取值范围{0,1}
+def precisionPerPixel(pred, label):
+    H = pred.get_shape().as_list()[1]
+    W = pred.get_shape().as_list()[2]
+    flat_logits = tf.reshape(pred, [-1,H*W])
+    flat_labels = tf.reshape(label, [-1,H*W])
+    return tf.reduce_mean(tf.reduce_sum(tf.cast(tf.equal(flat_logits, flat_labels), tf.float32), axis= 1) / (H * W))
+
+
+# 计算 图像分类的准确度,输入为one-hot 4D [None,1,1,num_cls]
+def precisionImage(predLogits, label):
+    predCls = tf.squeeze(tf.argmax(predLogits, axis=3))
+    gtCls = tf.squeeze(tf.argmax(label, axis=3))
+    N = tf.reduce_sum(tf.cast(tf.equal(gtCls, gtCls), tf.float32))
+    a = tf.reduce_sum(tf.cast(tf.equal(predCls, gtCls), tf.float32))
+    precision = a / N
+    return  precision
+
+
 
 def bridgeOri(inp,training,name='BridgeOri'):
     with tf.name_scope(name):
@@ -340,7 +429,7 @@ def vgg16Eye(inp, trainingFlag):
 
 
 '''
-def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,gtImg,gtLb):
+def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,gtImg,gtLb,predVis):
     # gtImg  [None,224,224,numClass];   gtLb [None,Numclass]
     ######################logits_28, logits_56, logits_112, logits_224, logitsClass, label, clsLabel)
     # logits [None,x,x,numClass]    logitsClass  [None,1,1,Numclass]
@@ -361,8 +450,6 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
     logitsClass_safe = clipSmall(logitsClass)
 
 
-
-
     Loss_Mask = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg, logits=logits_mask_safe, dim=3))
     Loss224 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg, logits=logits_224_safe, dim=3))
     gtImg_112 = tf.image.resize_bicubic(gtImg, [112, 112])
@@ -377,26 +464,25 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
     lossMask = 1.3*Loss_Mask + Loss224 + Loss_112 + Loss_56 + Loss_28
 
     loss = lossMask + Loss_Cls* 1.3
-    #
-    predCls = tf.squeeze(tf.argmax(logitsClass_safe, axis=3))
-    gtCls = tf.squeeze(tf.argmax(gtLb, axis=3))
-    N = tf.reduce_sum(tf.cast(tf.equal(gtCls, gtCls), tf.float32))
-    a = tf.reduce_sum(tf.cast(tf.equal(predCls, gtCls), tf.float32))
-    precision = a / N
 
 
-    tf.summary.scalar('Loss224',Loss224)
+
+   ########
+
+    iou1 = IOU(predVis,gtImg[:,:,:,1])
+    precisionCls = precisionImage(logitsClass_safe,gtLb)
+    ppp          = precisionPerPixel(tf.argmax(logits_mask_safe,axis=-1),tf.argmax(gtImg,axis=-1))
+
+
     tf.summary.scalar('LossMask224',Loss_Mask)
-    tf.summary.scalar('Loss_112',Loss_112)
-    tf.summary.scalar('Loss_56',Loss_56)
-    tf.summary.scalar('Loss_28',Loss_28)
     tf.summary.scalar('Loss_Cls',Loss_Cls)
-    tf.summary.scalar('Precision',precision)
+
+    tf.summary.scalar('Precision (classification)',precisionCls)
+    tf.summary.scalar('Precision (PerPixel)',ppp)
+    tf.summary.scalar('z_IOU(CLS1)', iou1)
 
 
     loss = tf.clip_by_value(loss,0,100.0)
-
-
     return loss
 
 def loadPretrainedResnet50(sess):
@@ -420,43 +506,12 @@ def clipSmall(logits):
     negPart = negLo * logits
     posGood = tf.clip_by_value(posPart,1e-10,10)
     negGood = tf.clip_by_value(negPart,-10,-(1e-10))
-
     return posGood + negGood
 
-def focalLossMap(output, label):
-    '''
-    :param output:[None,H,W,conf.TOTAL_CLS]
-    :param label:[[None,H,W,conf.TOTAL_CLS]]
-    :return:[]
-    '''
 
 
-    return tf.reduce_sum(output)
-
-def focalLossCls(output, label):
-    label = tf.cast(tf.greater(label, 0.5), tf.float32)
-
-    num_labels_pos = tf.reduce_sum(label)
-    num_labels_neg = tf.reduce_sum(1.0 - label)
-    num_total = num_labels_pos + num_labels_neg
-
-    p = tf.sigmoid(output)
-    # p = output
-    pos = tf.multiply(p, label)
-    neg = tf.multiply((1.0 - p), (1.0 - label))
-    final_p = pos + neg
-    pos_p = tf.clip_by_value(pos, 1e-12, (1.0 - 1e-12))
-    neg_p = tf.clip_by_value(neg, 1e-12, (1.0 - 1e-12))
-    pos_loss = tf.multiply(tf.multiply(-1.0, tf.log(pos_p)), label)
-    neg_loss = tf.multiply(tf.multiply(-1.0, tf.log(neg_p)), (1.0 - label))
 
 
-    pos_ratio = num_labels_neg / num_total
-    neg_ratio = num_labels_pos / num_total
-    sum_loss = pos_ratio * pos_loss + neg_ratio * neg_loss
-
-    final_loss = tf.multiply((1.0 - final_p) ** 2, sum_loss)
-    return tf.reduce_sum(final_loss)
 
 def main():
     g = tf.Graph()

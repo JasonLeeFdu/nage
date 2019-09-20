@@ -273,6 +273,14 @@ class ResNet(object):
         test_accuracy = self.sess.run(self.test_accuracy, feed_dict=test_feed_dict)
         print("test_accuracy: {}".format(test_accuracy))
 
+def ConvLayer(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='Conv2d'):
+    with tf.name_scope(name):
+        weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
+        bias   = tf.Variable(tf.truncated_normal([outc],mean=0,stddev=1e-8),name='bias')
+        out    = tf.nn.conv2d(inp,weight,padding=padding,name='conv',strides=strides) + bias
+        out    = tf.layers.batch_normalization(out,training=training)
+        out    = tf.nn.relu(out)
+    return out
 
 def getRes18(inp, num_class, is_training=True, reuse=False):
     with tf.variable_scope("Resnet", reuse=reuse):
@@ -336,13 +344,12 @@ def getRes18(inp, num_class, is_training=True, reuse=False):
         logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
         '''
 
-        ''' 原始设置'''
+        ''' 原始设置 -- 目前最佳 周五
         ########################################################################################################
 
         L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
         tmp = L28
-        for i in range(1, residual_list[3]) :
-            tmp = resblockSpecial1(tmp, channels=ch*16, is_training=is_training, downsample=True, scope='resblock_3_' + str(i))
+        tmp = resblockSpecial1(tmp, channels=ch*16, is_training=is_training, downsample=True, scope='resblock_3_' + str(i))
 
         ######################################################################################################## 
 
@@ -351,7 +358,16 @@ def getRes18(inp, num_class, is_training=True, reuse=False):
         x3 = global_avg_pooling(x2)
         logitMid = dropout(x3, is_training)
         logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+        '''
 
+        '''改进三：'''
+        L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
+        c1  = ConvLayer(L28,3,3,256,512,is_training,strides=[1,2,2,1])
+        c1  = tf.nn.max_pool(c1,[1,2,2,1],strides=[1,2,2,1],padding='SAME')
+        c2  = ConvLayer(c1,7,7,512,1024,is_training,strides=[1,2,2,1],padding='VALID')
+        logitMid = dropout(c2, is_training)
+        logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+        ##
 
 
 
