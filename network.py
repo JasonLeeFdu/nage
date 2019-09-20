@@ -508,37 +508,6 @@ if __name__ == '__main__':
 
 
 
-'''
-# 打开session开始计算
-with tf.Session(graph=g) as sess:
-    sess.run([initOpt])
-
-    vgg_var_list = tf.global_variables('resnet_v2_50')
-    vgg_var_list = vgg_var_list[:-2]
-    saver = tf.train.Saver(vgg_var_list)
-    saver.restore(sess,'model/resnet_v2_50.ckpt')
-
-    in0 = np.random.random([5,224,224,3])
-    writer = tf.summary.FileWriter('log', sess.graph)
-    vvx = tf.Variable(0)
-    liOri = sess.run(li,feed_dict={x:in0})
-    liKeys = li
-
-    for i in range(len(liKeys)):
-        k = liKeys[i]
-        v = liOri[i]
-        print('')
-        print('===============================================================')
-        print('KEY:');print(k)
-        print('V Shape: ');print(v.shape)
-        print('---------------------------------------------------------------')
-        print('')
-
-
-
-'''
-
-
 
 
 
