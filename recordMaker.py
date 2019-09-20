@@ -21,7 +21,6 @@ from tqdm import tqdm
 import skimage
 # Program
 import Config as conf
-import NetBricks.ljchopt1 as bricks
 import Utils.common as tools
 from tqdm import tqdm
 

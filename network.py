@@ -17,7 +17,6 @@ from tqdm import tqdm
 
 # Program
 import Config as conf
-import NetBricks.ljchopt1 as bricks
 import Utils.common as tools
 
 # network
