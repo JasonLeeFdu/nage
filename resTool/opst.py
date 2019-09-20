@@ -57,6 +57,15 @@ def resblock(x_init, channels, is_training=True, use_bias=True, downsample=False
         x = conv(x, channels, kernel=3, stride=1, use_bias=use_bias, scope='conv_1')
         return x + x_init
 
+def ConvLayer(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='Conv2d'):
+    with tf.name_scope(name):
+        weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
+        bias   = tf.Variable(tf.truncated_normal([outc],mean=0,stddev=1e-8),name='bias')
+        out    = tf.nn.conv2d(inp,weight,padding=padding,name='conv',strides=strides) + bias
+        out    = tf.layers.batch_normalization(out,training=training)
+        out    = tf.nn.relu(out)
+    return out
+
 
 def resblockSpecial1(x_init, channels, is_training=True, use_bias=True, downsample=False, scope='resblock'):
     with tf.variable_scope(scope):
@@ -69,6 +78,7 @@ def resblockSpecial1(x_init, channels, is_training=True, use_bias=True, downsamp
         x = batch_norm(x, is_training, scope='batch_norm_1')
         x = relu(x)
         x = conv(x, 2 * channels, kernel=3, stride=2, use_bias=use_bias, scope='conv_1')
+
         return x + x_init
 
 

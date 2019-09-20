@@ -302,6 +302,41 @@ def getRes18V1(inp, num_class, is_training=True, reuse=False):
         for i in range(1, residual_list[2]) :
             tmp = residual_block(tmp, channels=ch*4, is_training=is_training, downsample=False, scope='resblock2_' + str(i))
 
+
+
+        '''改进二 最后一段接短点 
+        ########################################################################################################
+
+        L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
+        x1 = batch_norm(L28, is_training, scope='batch_normx1')
+        x2 = tf.nn.leaky_relu(x1)
+        x2 = conv(x2, channels=ch*16,kernel=3,scope='resblock_3_' + str(i))
+
+        ########################################################################################################
+
+        x3 = batch_norm(x2, is_training, scope='batch_normx3')
+        x3 = tf.nn.leaky_relu(x3)
+        x3 = global_avg_pooling(x3)
+        logitMid = dropout(x3, is_training)
+        logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+        '''
+
+        ''' 改进一：中间直接解出来
+        L28 = residual_block(tmp, channels=ch * 8, is_training=is_training, downsample=True, scope='resblock_3_0')
+
+        c1 = conv(L56,ch * 4,scope='appendc1')
+        c1 = batch_norm(c1,is_training,scope='appendc1')
+        c1 = relu(c1)
+        c1 = tf.nn.max_pool(c1,[1,2,2,1],[1,2,2,1],'SAME')
+        c2 = conv(c1, ch * 8,scope='appendc2')
+        c2 = batch_norm(c2, is_training,scope='appendc2')
+        c2 = relu(c2)
+        x3 = global_avg_pooling(c2)
+        logitMid = dropout(x3, is_training)
+        logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+        '''
+
+        ''' 原始设置'''
         ########################################################################################################
 
         L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
@@ -309,13 +344,16 @@ def getRes18V1(inp, num_class, is_training=True, reuse=False):
         for i in range(1, residual_list[3]) :
             tmp = resblockSpecial1(tmp, channels=ch*16, is_training=is_training, downsample=True, scope='resblock_3_' + str(i))
 
-        ########################################################################################################
+        ######################################################################################################## 
 
         x1 = batch_norm(tmp, is_training, scope='batch_norm')
         x2 = tf.nn.leaky_relu(x1)
         x3 = global_avg_pooling(x2)
         logitMid = dropout(x3, is_training)
         logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+
+
+
 
         endPoints = dict()
         endPoints['L224']  = L224

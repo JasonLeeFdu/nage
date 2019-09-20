@@ -271,112 +271,6 @@ def ResNet18EyeV1(inp, trainingFlag):
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
-def ResNet18EyeV2(inp, trainingFlag):
-    num_class = conf.FIANL_CLASSES_NUM
-    is_training = trainingFlag
-    with tf.variable_scope("Resnet"):
-        residual_block = resblock
-        residual_list = get_residual_layer(18)
-
-        ch = 32
-        tmp = conv(inp, channels=ch, kernel=3, stride=1, scope='conv')
-
-        L224 = tmp
-
-        for i in range(residual_list[0]):
-            tmp = residual_block(tmp, channels=ch, is_training=is_training, downsample=False,
-                                 scope='resblock0_' + str(i))
-
-        ########################################################################################################
-
-        L112 = residual_block(tmp, channels=ch * 2, is_training=is_training, downsample=True, scope='resblock1_0')
-        tmp = L112
-        for i in range(1, residual_list[1]):
-            tmp = residual_block(tmp, channels=ch * 2, is_training=is_training, downsample=False,
-                                 scope='resblock1_' + str(i))
-
-        ########################################################################################################
-
-        L56 = residual_block(tmp, channels=ch * 4, is_training=is_training, downsample=True, scope='resblock2_0')
-        tmp = L56
-        for i in range(1, residual_list[2]):
-            tmp = residual_block(tmp, channels=ch * 4, is_training=is_training, downsample=False,
-                                 scope='resblock2_' + str(i))
-
-        ########################################################################################################
-
-        L28 = residual_block(tmp, channels=ch * 8, is_training=is_training, downsample=True, scope='resblock_3_0')
-        tmp = L28
-        for i in range(1, residual_list[3]):
-            tmp = residual_block(tmp, channels=ch * 8, is_training=is_training, downsample=False,
-                                 scope='resblock_3_' + str(i))
-
-        ########################################################################################################
-
-        x1 = batch_norm(tmp, is_training, scope='batch_norm')
-        x2 = relu(x1)
-
-        x3_1 = global_avg_pooling(x2)
-    with tf.name_scope('FPN_Pyramid'):
-        pipe224 = bridgeOriRes18(L224, is_training)
-        pipe112 = ConvLayer(L112, 3, 3, 64, 32, is_training)
-        pipe56 = ConvLayer(L56, 3, 3, 128, 64, is_training)
-        pipe28 = ConvLayer(L28, 3, 3, 256, 128, is_training)  # =>[None,28,28,128]
-
-        fm56New = tf.image.resize_images(pipe28, [56, 56], align_corners=True)
-        fm56New = ConvLayer(fm56New, 3, 3, 128, 64, is_training)
-        out56 = fm56New + pipe56  # =>[None,56,56,64]
-        fm112New = tf.layers.conv2d_transpose(out56, 32, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
-        out112 = fm112New + pipe112  # =>[None,112,112,32]
-        fm224New = tf.layers.conv2d_transpose(out112, 16, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
-        out224 = fm224New + pipe224  # =>[None,224,224,16]
-
-        # outward opts
-        logits_28 = ConvLayerNoRELU(pipe28, 1, 1, 128, conf.FIANL_CLASSES_NUM, training=is_training,
-                                    name='logits_28')
-        logits_56 = ConvLayerNoRELU(out56, 1, 1, 64, conf.FIANL_CLASSES_NUM, training=is_training,
-                                    name='logits_56')
-        logits_112 = ConvLayerNoRELU(out112, 1, 1, 32, conf.FIANL_CLASSES_NUM, training=is_training,
-                                     name='logits_112')
-        logits_224 = ConvLayerNoRELU(out224, 1, 1, 16, conf.FIANL_CLASSES_NUM, training=is_training,
-                                     name='logits_224')
-        logits_28_224 = tf.image.resize_images(logits_28, [224, 224], align_corners=True)
-        logits_56_224 = tf.image.resize_images(logits_56, [224, 224], align_corners=True)
-        logits_112_224 = tf.image.resize_images(logits_112, [224, 224], align_corners=True)
-        concatedLogits = tf.concat([logits_28_224, logits_56_224, logits_112_224, logits_224], axis=-1)
-        logitMask = ConvLayerNoRELU(concatedLogits, 1, 1, 4 * conf.FIANL_CLASSES_NUM, conf.FIANL_CLASSES_NUM,
-                                    is_training)
-        # 来自mask预测
-        x3_2 = global_avg_pooling(concatedLogits)
-        x3 = tf.concat([x3_1, x3_2], axis=-1)
-
-        x3 = tf.nn.leaky_relu(x3)
-        feat = dropout(x3, is_training)
-        logitMid = fully_conneted(feat, units=256, scope='logitMid')
-        logitMid = tf.nn.leaky_relu(logitMid)
-        logitMid = dropout(logitMid, is_training)
-        logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
-
-        logitsClass = tf.expand_dims(logitFinal, axis=1)
-        logitsClass = tf.expand_dims(logitsClass, axis=1)
-        predFlat = tf.argmax(logitMask, axis=3)
-        predVis = tf.nn.softmax(logitMask, axis=3)
-        predVis = predVis[:, :, :, 1]
-        predCls = tf.squeeze(tf.argmax(logitsClass, axis=3))
-
-        ## 观察网路的参数变化情况 -- 仅仅在网络内部加入histogram 观察参数分布的变化
-        dg = tf.get_default_graph()
-        tf.summary.histogram('logits_224/weights', dg.get_tensor_by_name('FPN_Pyramid/logits_224/weight:0'))
-        tf.summary.histogram('logits_224/bias', dg.get_tensor_by_name('FPN_Pyramid/logits_224/bias:0'))
-        tf.summary.histogram('logits_28/weights', dg.get_tensor_by_name('FPN_Pyramid/logits_28/weight:0'))
-        tf.summary.histogram('logits_28/bias', dg.get_tensor_by_name('FPN_Pyramid/logits_28/bias:0'))
-        ################
-
-
-
-        return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
-
-
 ###
 def vgg16Eye(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
@@ -493,7 +387,7 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
     Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
     lossMask = 1.3*Loss_Mask + Loss224 + Loss_112 + Loss_56 + Loss_28
 
-    loss = lossMask + Loss_Cls
+    loss = lossMask + Loss_Cls* 1.3
     #
     predCls = tf.squeeze(tf.argmax(logitsClass_safe, axis=3))
     gtCls = tf.squeeze(tf.argmax(gtLb, axis=3))
@@ -534,8 +428,8 @@ def loadPretrainedResnetVGG19(sess):
 
 
 
-LjchCNN = vgg19Eye
-backbone_name = 'vgg_19' #'resnet18'
+LjchCNN = ResNet18EyeV1
+backbone_name = 'resnet18' #'resnet18'
 
 
 
