@@ -48,7 +48,7 @@ def trainClsModel():
     # 目录
     tools.securePath(conf.LOG_PATH)
     tools.securePath(conf.MODEL_PATH)
-    LjchCNN = ResNet18LightCls
+    LjchCNN = ResNet18Eyev1_1
     with tf.Session() as sess:
         ## summarize 的名字
         trainWriter = tf.summary.FileWriter(os.path.join(conf.LOG_PATH, 'train'), sess.graph)
