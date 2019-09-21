@@ -27,6 +27,14 @@ from resTool.ResNetGen import *
 slim = tf.contrib.slim
 dbgList = list()
 
+'''#################################################################################
+
+                            第一部分
+                            
+                          基本层与函数
+
+  #################################################################################
+'''
 def ConvLayer(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='Conv2d'):
     with tf.name_scope(name):
         weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
@@ -135,8 +143,6 @@ def IOU(pred,gt):
     iou = tf.reduce_mean((intersection + 1e-7) / (denominator + 1e-7))
     return iou
 
-
-
 # 计算 每张图的像素的准确度,输入为one-hot 4D [None,H,W] 取值范围{0,1}
 def precisionPerPixel(pred, label):
     H = pred.get_shape().as_list()[1]
@@ -144,7 +150,6 @@ def precisionPerPixel(pred, label):
     flat_logits = tf.reshape(pred, [-1,H*W])
     flat_labels = tf.reshape(label, [-1,H*W])
     return tf.reduce_mean(tf.reduce_sum(tf.cast(tf.equal(flat_logits, flat_labels), tf.float32), axis= 1) / (H * W))
-
 
 # 计算 图像分类的准确度,输入为one-hot 4D [None,1,1,num_cls]
 def precisionImage(predLogits, label):
@@ -154,8 +159,6 @@ def precisionImage(predLogits, label):
     a = tf.reduce_sum(tf.cast(tf.equal(predCls, gtCls), tf.float32))
     precision = a / N
     return  precision
-
-
 
 def bridgeOri(inp,training,name='BridgeOri'):
     with tf.name_scope(name):
@@ -171,7 +174,6 @@ def bridgeOriRes18(inp,training,name='BridgeOri'):
         l3 = ConvLayer(l2,3,3,32,16,training,name='Conv3')
     return l3
 
-
 def horzBlock(inp,inc,outc,trainingFlag,name='horzBlock'):
     with tf.name_scope(name):
         l1 = ConvLayer(inp,3,3,inc,outc,trainingFlag)
@@ -186,8 +188,138 @@ def vertBlock(inp,inc,trainingFlag,name='vertBlock'):
         l3 = ConvLayer(l2,3,3,outc,outc,trainingFlag)
     return l3
 
-###
-def ResNet50Eye(inp,trainingFlag):
+# 损失函数
+def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,gtImg,gtLb,predVis):
+    # gtImg  [None,224,224,numClass];   gtLb [None,Numclass]
+    ######################logits_28, logits_56, logits_112, logits_224, logitsClass, label, clsLabel)
+    # logits [None,x,x,numClass]    logitsClass  [None,1,1,Numclass]
+    '''
+    logits_mask_safe = tf.clip_by_value(logitMask,1e-10,10)
+    logits_224_safe = tf.clip_by_value(logits_224,1e-10,10)
+    logits_112_safe = tf.clip_by_value(logits_112,1e-10,10)
+    logits_56_safe = tf.clip_by_value(logits_56,1e-10,10)
+    logits_28_safe = tf.clip_by_value(logits_28,1e-10,10)
+    logitsClass_safe = tf.clip_by_value(logitsClass,1e-10,10)
+    '''
+
+    logits_mask_safe = clipSmall(logitMask)
+    logits_224_safe = clipSmall(logits_224)
+    logits_112_safe = clipSmall(logits_112)
+    logits_56_safe = clipSmall(logits_56)
+    logits_28_safe = clipSmall(logits_28)
+    logitsClass_safe = clipSmall(logitsClass)
+
+
+    Loss_Mask = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg, logits=logits_mask_safe, dim=3))
+    Loss224 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg, logits=logits_224_safe, dim=3))
+    gtImg_112 = tf.image.resize_bicubic(gtImg, [112, 112])
+    Loss_112 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg_112, logits=logits_112_safe, dim=3))
+    gtImg_56 = tf.image.resize_bicubic(gtImg_112, [56, 56])
+    Loss_56  = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg_56, logits=logits_56_safe, dim=3))
+    gtImg_28 = tf.image.resize_bicubic(gtImg_56, [28, 28])
+    Loss_28  = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg_28, logits=logits_28_safe, dim=3))
+
+
+    Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
+    lossMask = 1.3*Loss_Mask + Loss224 + Loss_112 + Loss_56 + Loss_28
+
+    loss = lossMask + Loss_Cls* 1.3
+
+
+
+   ########
+
+    iou1 = IOU(predVis,gtImg[:,:,:,1])
+    precisionCls = precisionImage(logitsClass_safe,gtLb)
+    ppp          = precisionPerPixel(tf.argmax(logits_mask_safe,axis=-1),tf.argmax(gtImg,axis=-1))
+
+
+    tf.summary.scalar('LossMask224',Loss_Mask)
+    tf.summary.scalar('Loss_Cls',Loss_Cls)
+
+    tf.summary.scalar('Precision (classification)',precisionCls)
+    tf.summary.scalar('Precision (PerPixel)',ppp)
+    tf.summary.scalar('z_IOU(CLS1)', iou1)
+
+
+    loss = tf.clip_by_value(loss,0,100.0)
+    return loss
+
+def lossOnlyCls(logitsClass,gtLb):
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass_safe = clipSmall(logitsClass)
+    Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
+    #Loss_Cls = focalLoss(logitsClass_safe,gtLb)
+    precisionCls = precisionImage(logitsClass_safe, gtLb)
+    tf.summary.scalar('Loss_Cls', Loss_Cls)
+    tf.summary.scalar('Precision (classification)', precisionCls)
+    return  Loss_Cls
+
+
+def focalLossOnlyCls(logitsClass,gtLb):
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass_safe = clipSmall(logitsClass)
+    Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
+    #Loss_Cls = focalLoss(logitsClass_safe,gtLb)
+    precisionCls = precisionImage(logitsClass_safe, gtLb)
+    tf.summary.scalar('Loss_Cls', Loss_Cls)
+    tf.summary.scalar('Precision (classification)', precisionCls)
+    return  Loss_Cls
+
+'''#################################################################################
+
+                            第二部分
+                            
+                            辅助功能
+
+   #################################################################################
+'''
+
+# 装载函数1
+def loadPretrainedResnet50(sess):
+    vgg_var_list = tf.global_variables('resnet_v2_50')
+    vgg_var_list = vgg_var_list[:-2]
+    saver = tf.train.Saver(vgg_var_list)
+    saver.restore(sess, 'model/pretrained/resnet_v2_50.ckpt')
+    print('Pretrained Loaded')
+
+# 装载函数2
+def loadPretrainedResnetVGG19(sess):
+    vgg_var_list = tf.global_variables('vgg_19')
+    vgg_var_list = vgg_var_list[:-2]
+    saver = tf.train.Saver(vgg_var_list)
+    saver.restore(sess, 'model/pretrained/vgg_19.ckpt')
+    print('Pretrained Loaded')
+
+# 限定函数
+def clipSmall(logits):
+    posLo = tf.cast(logits >= 0,tf.float32)
+    negLo = tf.cast(logits < 0,tf.float32)
+    posPart = posLo * logits
+    negPart = negLo * logits
+    posGood = tf.clip_by_value(posPart,1e-10,10)
+    negGood = tf.clip_by_value(negPart,-10,-(1e-10))
+    return posGood + negGood
+
+
+
+
+
+
+'''#################################################################################
+
+                            第三部分
+                            
+                          成熟的网络模型  
+                  
+                  娱乐版->尝试版->实验版(V.x)->正式版/最终版(V.x.y)
+
+   #################################################################################
+'''
+### 娱乐版
+def ResNet50(inp,trainingFlag):
     with slim.arg_scope(nets.resnet_v2.resnet_arg_scope()):
         resnet50,endPoints = nets.resnet_v2.resnet_v2_50(inp,num_classes=5,is_training=trainingFlag)
         conv1 = endPoints['resnet_v2_50/conv1']
@@ -238,7 +370,7 @@ def ResNet50Eye(inp,trainingFlag):
             tf.summary.histogram('resnet_v2_50/logits/bias',dg.get_tensor_by_name('resnet_v2_50/logits/biases:0'))
         return logits_28,logits_56,logits_112,logits_224,logitsClass,predFlat,predCls,predVis
 
-### 实验版
+### 尝试版
 def vgg19Eye(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
         resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=conf.FIANL_CLASSES_NUM,is_training=trainingFlag)
@@ -298,65 +430,7 @@ def vgg19Eye(inp, trainingFlag):
 
         return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
-
-### 测试版v1 2019年9月20号周五
-def ResNet18Eyev1(inp, trainingFlag):
-    endPoints = getRes18(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
-    L224 = endPoints['L224']
-    L112 = endPoints['L112']
-    L56 = endPoints['L56']
-    L28 = endPoints['L28']
-    logitFinal = endPoints['logitFinal']
-
-    with tf.name_scope('FPN_Pyramid'):
-        pipe224 = bridgeOriRes18(L224, trainingFlag)
-        pipe112 = ConvLayer(L112, 3, 3, 64, 32, trainingFlag)
-        pipe56 = ConvLayer(L56, 3, 3, 128, 64, trainingFlag)
-        pipe28 = ConvLayer(L28, 3, 3, 256, 128, trainingFlag)  # =>[None,28,28,128]
-
-        fm56New = tf.image.resize_images(pipe28, [56, 56], align_corners=True)
-        fm56New = ConvLayer(fm56New, 3, 3, 128, 64, trainingFlag)
-        out56 = fm56New + pipe56  # =>[None,56,56,64]
-        fm112New = tf.layers.conv2d_transpose(out56, 32, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
-        out112 = fm112New + pipe112  # =>[None,112,112,32]
-        fm224New = tf.layers.conv2d_transpose(out112, 16, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
-        out224 = fm224New + pipe224  # =>[None,224,224,16]
-
-        # outward opts
-        logits_28 = ConvLayerNoRELU(pipe28, 1, 1, 128, conf.FIANL_CLASSES_NUM, training=trainingFlag,
-                              name='logits_28')
-        logits_56 = ConvLayerNoRELU(out56, 1, 1, 64, conf.FIANL_CLASSES_NUM, training=trainingFlag,
-                              name='logits_56')
-        logits_112 = ConvLayerNoRELU(out112, 1, 1, 32, conf.FIANL_CLASSES_NUM, training=trainingFlag,
-                               name='logits_112')
-        logits_224 = ConvLayerNoRELU(out224, 1, 1, 16, conf.FIANL_CLASSES_NUM, training=trainingFlag,
-                               name='logits_224')
-        logits_28_224 = tf.image.resize_images(logits_28,[224,224],align_corners=True)
-        logits_56_224 = tf.image.resize_images(logits_56,[224,224],align_corners=True)
-        logits_112_224 = tf.image.resize_images(logits_112,[224,224],align_corners=True)
-        concatedLogits = tf.concat([logits_28_224,logits_56_224,logits_112_224,logits_224],axis=-1)
-        logitMask = ConvLayerNoRELU(concatedLogits,1,1,4*conf.FIANL_CLASSES_NUM,conf.FIANL_CLASSES_NUM,trainingFlag)
-
-        logitsClass = tf.expand_dims(logitFinal, axis=1)
-        logitsClass = tf.expand_dims(logitsClass, axis=1)
-        predFlat = tf.argmax(logitMask, axis=3)
-        predVis = tf.nn.softmax(logitMask, axis=3)
-        predVis = predVis[:, :, :, 1]
-        predCls = tf.squeeze(tf.argmax(logitsClass, axis=3))
-
-        ## 观察网路的参数变化情况 -- 仅仅在网络内部加入histogram 观察参数分布的变化
-        dg = tf.get_default_graph()
-        tf.summary.histogram('logits_224/weights', dg.get_tensor_by_name('FPN_Pyramid/logits_224/weight:0'))
-        tf.summary.histogram('logits_224/bias', dg.get_tensor_by_name('FPN_Pyramid/logits_224/bias:0'))
-        tf.summary.histogram('Resnet/logitFinal/dense/kernel:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/kernel:0'))
-        tf.summary.histogram('Resnet/logitFinal/dense/bias:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/bias:0'))
-    tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
-
-
-    return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
-
-
-### 实验版
+### 尝试版
 def vgg16Eye(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
         resnet50, endPoints = nets.vgg.vgg_16(inp,num_classes=conf.FIANL_CLASSES_NUM,is_training=trainingFlag)
@@ -421,94 +495,94 @@ def vgg16Eye(inp, trainingFlag):
             return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
+### 实验版v1 功能：同时预测概率和部位  2019年9月20号周五
+def ResNet18Eyev1(inp, trainingFlag):
+    endPoints = getRes18(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
+    L224 = endPoints['L224']
+    L112 = endPoints['L112']
+    L56 = endPoints['L56']
+    L28 = endPoints['L28']
+    logitFinal = endPoints['logitFinal']
+
+    with tf.name_scope('FPN_Pyramid'):
+        pipe224 = bridgeOriRes18(L224, trainingFlag)
+        pipe112 = ConvLayer(L112, 3, 3, 64, 32, trainingFlag)
+        pipe56 = ConvLayer(L56, 3, 3, 128, 64, trainingFlag)
+        pipe28 = ConvLayer(L28, 3, 3, 256, 128, trainingFlag)  # =>[None,28,28,128]
+
+        fm56New = tf.image.resize_images(pipe28, [56, 56], align_corners=True)
+        fm56New = ConvLayer(fm56New, 3, 3, 128, 64, trainingFlag)
+        out56 = fm56New + pipe56  # =>[None,56,56,64]
+        fm112New = tf.layers.conv2d_transpose(out56, 32, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
+        out112 = fm112New + pipe112  # =>[None,112,112,32]
+        fm224New = tf.layers.conv2d_transpose(out112, 16, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
+        out224 = fm224New + pipe224  # =>[None,224,224,16]
+
+        # outward opts
+        logits_28 = ConvLayerNoRELU(pipe28, 1, 1, 128, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                              name='logits_28')
+        logits_56 = ConvLayerNoRELU(out56, 1, 1, 64, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                              name='logits_56')
+        logits_112 = ConvLayerNoRELU(out112, 1, 1, 32, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                               name='logits_112')
+        logits_224 = ConvLayerNoRELU(out224, 1, 1, 16, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                               name='logits_224')
+        logits_28_224 = tf.image.resize_images(logits_28,[224,224],align_corners=True)
+        logits_56_224 = tf.image.resize_images(logits_56,[224,224],align_corners=True)
+        logits_112_224 = tf.image.resize_images(logits_112,[224,224],align_corners=True)
+        concatedLogits = tf.concat([logits_28_224,logits_56_224,logits_112_224,logits_224],axis=-1)
+        logitMask = ConvLayerNoRELU(concatedLogits,1,1,4*conf.FIANL_CLASSES_NUM,conf.FIANL_CLASSES_NUM,trainingFlag)
+
+        logitsClass = tf.expand_dims(logitFinal, axis=1)
+        logitsClass = tf.expand_dims(logitsClass, axis=1)
+        predFlat = tf.argmax(logitMask, axis=3)
+        predVis = tf.nn.softmax(logitMask, axis=3)
+        predVis = predVis[:, :, :, 1]
+        predCls = tf.squeeze(tf.argmax(logitsClass, axis=3))
+
+        ## 观察网路的参数变化情况 -- 仅仅在网络内部加入histogram 观察参数分布的变化
+        dg = tf.get_default_graph()
+        tf.summary.histogram('logits_224/weights', dg.get_tensor_by_name('FPN_Pyramid/logits_224/weight:0'))
+        tf.summary.histogram('logits_224/bias', dg.get_tensor_by_name('FPN_Pyramid/logits_224/bias:0'))
+        tf.summary.histogram('Resnet/logitFinal/dense/kernel:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/kernel:0'))
+        tf.summary.histogram('Resnet/logitFinal/dense/bias:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/bias:0'))
+    tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
+
+
+    return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
+
+
+### 尝试版 功能：对白光进行多多二分类初步筛选  2019年9月20号周五
+### 首次使用
+### Neijing_Resnet18X64_CLS_20190920-A
+def ResNet18LightCls(inp, trainingFlag):
+    with tf.variable_scope("ResNet18LightCls"):
+        logitsCls = getRes18Cls(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
+    pred = tf.argmax(logitsCls,axis=-1)
+    return  logitsCls,pred
 
 
 
-'''
-以下是损失函数类
-
-
-'''
-def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,gtImg,gtLb,predVis):
-    # gtImg  [None,224,224,numClass];   gtLb [None,Numclass]
-    ######################logits_28, logits_56, logits_112, logits_224, logitsClass, label, clsLabel)
-    # logits [None,x,x,numClass]    logitsClass  [None,1,1,Numclass]
-    '''
-    logits_mask_safe = tf.clip_by_value(logitMask,1e-10,10)
-    logits_224_safe = tf.clip_by_value(logits_224,1e-10,10)
-    logits_112_safe = tf.clip_by_value(logits_112,1e-10,10)
-    logits_56_safe = tf.clip_by_value(logits_56,1e-10,10)
-    logits_28_safe = tf.clip_by_value(logits_28,1e-10,10)
-    logitsClass_safe = tf.clip_by_value(logitsClass,1e-10,10)
-    '''
-
-    logits_mask_safe = clipSmall(logitMask)
-    logits_224_safe = clipSmall(logits_224)
-    logits_112_safe = clipSmall(logits_112)
-    logits_56_safe = clipSmall(logits_56)
-    logits_28_safe = clipSmall(logits_28)
-    logitsClass_safe = clipSmall(logitsClass)
-
-
-    Loss_Mask = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg, logits=logits_mask_safe, dim=3))
-    Loss224 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg, logits=logits_224_safe, dim=3))
-    gtImg_112 = tf.image.resize_bicubic(gtImg, [112, 112])
-    Loss_112 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg_112, logits=logits_112_safe, dim=3))
-    gtImg_56 = tf.image.resize_bicubic(gtImg_112, [56, 56])
-    Loss_56  = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg_56, logits=logits_56_safe, dim=3))
-    gtImg_28 = tf.image.resize_bicubic(gtImg_56, [28, 28])
-    Loss_28  = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtImg_28, logits=logits_28_safe, dim=3))
-
-
-    Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
-    lossMask = 1.3*Loss_Mask + Loss224 + Loss_112 + Loss_56 + Loss_28
-
-    loss = lossMask + Loss_Cls* 1.3
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
+### 二分类与Focalloss
+###
+def ResNet18LightCls2(inp, trainingFlag):
+    with tf.variable_scope("ResNet18LightCls"):
+        logitsCls = getRes18Cls(inp,2,trainingFlag)
+    pred = tf.argmax(logitsCls,axis=-1)
+    return  logitsCls,pred
 
 
 
-   ########
-
-    iou1 = IOU(predVis,gtImg[:,:,:,1])
-    precisionCls = precisionImage(logitsClass_safe,gtLb)
-    ppp          = precisionPerPixel(tf.argmax(logits_mask_safe,axis=-1),tf.argmax(gtImg,axis=-1))
-
-
-    tf.summary.scalar('LossMask224',Loss_Mask)
-    tf.summary.scalar('Loss_Cls',Loss_Cls)
-
-    tf.summary.scalar('Precision (classification)',precisionCls)
-    tf.summary.scalar('Precision (PerPixel)',ppp)
-    tf.summary.scalar('z_IOU(CLS1)', iou1)
-
-
-    loss = tf.clip_by_value(loss,0,100.0)
-    return loss
-
-def loadPretrainedResnet50(sess):
-    vgg_var_list = tf.global_variables('resnet_v2_50')
-    vgg_var_list = vgg_var_list[:-2]
-    saver = tf.train.Saver(vgg_var_list)
-    saver.restore(sess, 'model/pretrained/resnet_v2_50.ckpt')
-    print('Pretrained Loaded')
-
-def loadPretrainedResnetVGG19(sess):
-    vgg_var_list = tf.global_variables('vgg_19')
-    vgg_var_list = vgg_var_list[:-2]
-    saver = tf.train.Saver(vgg_var_list)
-    saver.restore(sess, 'model/pretrained/vgg_19.ckpt')
-    print('Pretrained Loaded')
-
-def clipSmall(logits):
-    posLo = tf.cast(logits >= 0,tf.float32)
-    negLo = tf.cast(logits < 0,tf.float32)
-    posPart = posLo * logits
-    negPart = negLo * logits
-    posGood = tf.clip_by_value(posPart,1e-10,10)
-    negGood = tf.clip_by_value(negPart,-10,-(1e-10))
-    return posGood + negGood
-
-
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
+### 测试比较vgg resnet性能
+###
+def vgg19LightCls(inp, trainingFlag):
+    with slim.arg_scope(nets.vgg.vgg_arg_scope()):
+        resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=2,is_training=trainingFlag)
+        logitsCls = endPoints['vgg_19/fc8']
+        pred = tf.argmax(logitsCls, axis=-1)
+        return logitsCls, pred
 
 
 
