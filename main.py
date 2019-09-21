@@ -48,7 +48,6 @@ def trainClsModel():
     # 目录
     tools.securePath(conf.LOG_PATH)
     tools.securePath(conf.MODEL_PATH)
-    LjchCNN = ResNet18Eyev1_1
     with tf.Session() as sess:
         ## summarize 的名字
         trainWriter = tf.summary.FileWriter(os.path.join(conf.LOG_PATH, 'train'), sess.graph)
@@ -77,7 +76,7 @@ def trainClsModel():
         clsLabel = tf.placeholder_with_default(input=clsLabelTrainB, shape=[None, 1, 1, conf.FIANL_CLASSES_NUM])
 
         # 构建网络
-        logitsClass, predCls = ResNet18LightCls(image, trainSwitch)
+        logitsClass, predCls = ResNet18LightClsV1_1(image, trainSwitch)
         lossFunc = lossOnlyCls( logitsClass, clsLabel)
         # loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
