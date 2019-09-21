@@ -230,8 +230,8 @@ def trainTogether():
         clsLabel = tf.placeholder_with_default(input=clsLabelTrainB,shape=[None,1,1,conf.FIANL_CLASSES_NUM])
 
         # 构建网络
-        logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis = LjchCNN(image,trainSwitch)
-        networkLoss = lossFunc(logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, label, clsLabel, predVis)
+        logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis = conf.FUNC_HANDEL(image,trainSwitch)
+        networkLoss = conf.LOSS_HANDLE(logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, label, clsLabel, predVis)
         # loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
 
@@ -371,7 +371,7 @@ def trainTogether():
 
 
 def main():
-    trainClsModel()
+    trainTogether()
 
 
 
