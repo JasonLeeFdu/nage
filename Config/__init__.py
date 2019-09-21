@@ -1,8 +1,15 @@
 import os
 import random
+from network import *
+import datetime
 
 # For Training 函数名+时间
-MODEL_Name = 'ResNet18LightClsV1_1_20190921'
+FUNC_NAME = 'ResNet18LightClsV1_1'
+LOSS_NAME = 'focalLossOnlyCls'
+INFO = 'FOCAL'
+MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
+FUNC_HANDEL = eval(FUNC_NAME)
+LOSS_HANDLE = eval(LOSS_NAME)
 
 
 

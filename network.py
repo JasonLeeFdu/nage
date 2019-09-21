@@ -246,6 +246,8 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
     return loss
 
 def lossOnlyCls(logitsClass,gtLb):
+    # 二分类专用
+    gtLb = gtLb[:, :, :, :2]
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass_safe = clipSmall(logitsClass)
@@ -258,11 +260,13 @@ def lossOnlyCls(logitsClass,gtLb):
 
 
 def focalLossOnlyCls(logitsClass,gtLb):
+    # 二分类专用
+    gtLb = gtLb[:, :, :, :2]
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass_safe = clipSmall(logitsClass)
-    Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
-    #Loss_Cls = focalLoss(logitsClass_safe,gtLb)
+    #Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
+    Loss_Cls = focalLoss(logitsClass_safe,gtLb)
     precisionCls = precisionImage(logitsClass_safe, gtLb)
     tf.summary.scalar('Loss_Cls', Loss_Cls)
     tf.summary.scalar('Precision (classification)', precisionCls)
@@ -556,7 +560,7 @@ def ResNet18Eyev1(inp, trainingFlag):
 
 ### 实验版v1.1 功能：同时预测概率和部位  2019年9月21号周六
 ### 修改每层提炼特征的卷积核心尺寸
-def ResNet18Eyev1_1(inp, trainingFlag):
+def ResNet18EyeV1_1(inp, trainingFlag):
     endPoints = getRes18(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
     L224 = endPoints['L224']
     L112 = endPoints['L112']
