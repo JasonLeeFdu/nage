@@ -7,5 +7,4 @@ __pycache__/
 .idea/
 pretrainedMod/
 Config/__pycache__
-Config/__init__.py
 
