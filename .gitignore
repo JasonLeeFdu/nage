@@ -6,3 +6,4 @@ NetBricks/
 __pycache__/
 .idea/
 pretrainedMod/
+Config/__init__.py

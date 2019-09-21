@@ -413,10 +413,10 @@ def getRes18Cls(inp, num_class, is_training=True):
 
     ########################################################################################################
 
-    x = batch_norm(x, is_training, scope='batch_norm')
+    x = batch_norm(x, is_training, scope='batch_norm1')
     x = relu(x)
-    x = conv(x,channels=ch*32,3,1)
-    x = batch_norm(x, is_training, scope='batch_norm')
+    x = conv(x,channels=ch*32,kernel=3,stride=1)
+    x = batch_norm(x, is_training, scope='batch_norm2')
     x = relu(x)
     x = global_avg_pooling(x)
     x = fully_conneted(x, units=num_class, scope='logit')

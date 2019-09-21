@@ -77,7 +77,7 @@ def trainClsModel():
         clsLabel = tf.placeholder_with_default(input=clsLabelTrainB, shape=[None, 1, 1, conf.FIANL_CLASSES_NUM])
 
         # 构建网络
-        logitsClass, predCls = LjchCNN(image, trainSwitch)
+        logitsClass, predCls = ResNet18LightCls(image, trainSwitch)
         lossFunc = lossOnlyCls( logitsClass, clsLabel)
         # loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
@@ -96,8 +96,6 @@ def trainClsModel():
         # 记录哪一些重要的节点
         tf.summary.image("input", image)
         tf.summary.image("label", tf.expand_dims(label[:, :, :, 1], axis=-1))
-        tf.summary.image("predVis(C1)", tf.expand_dims(predVis, axis=-1))
-
         tf.summary.scalar("Loss(networkAndL2)", loss)
 
         # 全局训练次数
@@ -374,7 +372,7 @@ def trainTogether():
 
 
 def main():
-    trainTogether()
+    trainClsModel()
 
 
 

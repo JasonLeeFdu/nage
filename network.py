@@ -246,8 +246,23 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
     return loss
 
 def lossOnlyCls(logitsClass,gtLb):
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass_safe = clipSmall(logitsClass)
     Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
+    #Loss_Cls = focalLoss(logitsClass_safe,gtLb)
+    precisionCls = precisionImage(logitsClass_safe, gtLb)
+    tf.summary.scalar('Loss_Cls', Loss_Cls)
+    tf.summary.scalar('Precision (classification)', precisionCls)
+    return  Loss_Cls
+
+
+def focalLossOnlyCls(logitsClass,gtLb):
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass_safe = clipSmall(logitsClass)
+    Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
+    #Loss_Cls = focalLoss(logitsClass_safe,gtLb)
     precisionCls = precisionImage(logitsClass_safe, gtLb)
     tf.summary.scalar('Loss_Cls', Loss_Cls)
     tf.summary.scalar('Precision (classification)', precisionCls)
@@ -537,10 +552,37 @@ def ResNet18Eyev1(inp, trainingFlag):
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
-### 尝试版 功能：对白光进行二分类初步筛选  2019年9月20号周五
+### 尝试版 功能：对白光进行多多二分类初步筛选  2019年9月20号周五
+### 首次使用
+### Neijing_Resnet18X64_CLS_20190920-A
 def ResNet18LightCls(inp, trainingFlag):
-    res = getRes18Cls(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
-    return  res
+    with tf.variable_scope("ResNet18LightCls"):
+        logitsCls = getRes18Cls(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
+    pred = tf.argmax(logitsCls,axis=-1)
+    return  logitsCls,pred
+
+
+
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
+### 二分类与Focalloss
+###
+def ResNet18LightCls2(inp, trainingFlag):
+    with tf.variable_scope("ResNet18LightCls"):
+        logitsCls = getRes18Cls(inp,2,trainingFlag)
+    pred = tf.argmax(logitsCls,axis=-1)
+    return  logitsCls,pred
+
+
+
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
+### 测试比较vgg resnet性能
+###
+def vgg19LightCls(inp, trainingFlag):
+    with slim.arg_scope(nets.vgg.vgg_arg_scope()):
+        resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=2,is_training=trainingFlag)
+        logitsCls = endPoints['vgg_19/fc8']
+        pred = tf.argmax(logitsCls, axis=-1)
+        return logitsCls, pred
 
 
 
