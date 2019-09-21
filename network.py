@@ -245,6 +245,7 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
     loss = tf.clip_by_value(loss,0,100.0)
     return loss
 
+
 def lossOnlyCls(logitsClass,gtLb):
     # 二分类专用
     gtLb = gtLb[:, :, :, :2]
