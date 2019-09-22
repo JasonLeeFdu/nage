@@ -329,7 +329,7 @@ def getRes18(inp, num_class, is_training=True, reuse=False):
         logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
         '''
 
-        ''' 改进一：中间直接解出来
+        ''' 改进一：中间直接解出来'''
         L28 = residual_block(tmp, channels=ch * 8, is_training=is_training, downsample=True, scope='resblock_3_0')
 
         c1 = conv(L56,ch * 4,scope='appendc1')
@@ -342,7 +342,7 @@ def getRes18(inp, num_class, is_training=True, reuse=False):
         x3 = global_avg_pooling(c2)
         logitMid = dropout(x3, is_training)
         logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
-        '''
+
 
         ''' 原始设置 -- 目前最佳 周五
         ########################################################################################################
@@ -360,7 +360,7 @@ def getRes18(inp, num_class, is_training=True, reuse=False):
         logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
         '''
 
-        '''改进三：'''
+        '''改进三：
         L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
         c1  = ConvLayer(L28,3,3,256,512,is_training,strides=[1,2,2,1])
         c1  = tf.nn.max_pool(c1,[1,2,2,1],strides=[1,2,2,1],padding='SAME')
@@ -368,9 +368,104 @@ def getRes18(inp, num_class, is_training=True, reuse=False):
         logitMid = dropout(c2, is_training)
         logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
         ##
+        '''
 
 
+        endPoints = dict()
+        endPoints['L224']  = L224
+        endPoints['L112']  = L112
+        endPoints['L56']  = L56
+        endPoints['L28']  = L28
+        endPoints['logitFinal']  = logitFinal
 
+        return endPoints
+
+
+def getRes18Dig(inp, num_class, choice,is_training=True, reuse=False):
+    with tf.variable_scope("Resnet", reuse=reuse):
+        residual_block = resblock
+        residual_list = get_residual_layer(18)
+
+        ch = 32
+        tmp = conv(inp, channels=ch, kernel=3, stride=1, scope='conv')
+
+        L224 = tmp
+
+
+        for i in range(residual_list[0]) :
+            tmp = residual_block(tmp, channels=ch, is_training=is_training, downsample=False, scope='resblock0_' + str(i))
+
+        ########################################################################################################
+
+        L112 = residual_block(tmp, channels=ch*2, is_training=is_training, downsample=True, scope='resblock1_0')
+        tmp = L112
+        for i in range(1, residual_list[1]) :
+            tmp = residual_block(tmp, channels=ch*2, is_training=is_training, downsample=False, scope='resblock1_' + str(i))
+
+        ########################################################################################################
+
+        L56 = residual_block(tmp, channels=ch*4, is_training=is_training, downsample=True, scope='resblock2_0')
+        tmp = L56
+        for i in range(1, residual_list[2]) :
+            tmp = residual_block(tmp, channels=ch*4, is_training=is_training, downsample=False, scope='resblock2_' + str(i))
+
+
+        if choice == 1:
+            '''改进二 最后一段接短点 '''
+            ########################################################################################################
+
+            L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
+            x1 = batch_norm(L28, is_training, scope='batch_normx1')
+            x2 = tf.nn.leaky_relu(x1)
+            x2 = conv(x2, channels=ch*16,kernel=3,scope='resblock_3_' + str(i))
+
+            ########################################################################################################
+
+            x3 = batch_norm(x2, is_training, scope='batch_normx3')
+            x3 = tf.nn.leaky_relu(x3)
+            x3 = global_avg_pooling(x3)
+            logitMid = dropout(x3, is_training)
+            logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+
+        elif choice == 2:
+            ''' 改进一：中间直接解出来'''
+            L28 = residual_block(tmp, channels=ch * 8, is_training=is_training, downsample=True, scope='resblock_3_0')
+
+            c1 = conv(L56, ch * 4, scope='appendc1')
+            c1 = batch_norm(c1, is_training, scope='appendc1')
+            c1 = relu(c1)
+            c1 = tf.nn.max_pool(c1, [1, 2, 2, 1], [1, 2, 2, 1], 'SAME')
+            c2 = conv(c1, ch * 8, scope='appendc2')
+            c2 = batch_norm(c2, is_training, scope='appendc2')
+            c2 = relu(c2)
+            x3 = global_avg_pooling(c2)
+            logitMid = dropout(x3, is_training)
+            logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+        elif choice == 3:
+            ''' 原始设置 -- 目前最佳 周五'''
+            ########################################################################################################
+
+            L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
+            tmp = L28
+            tmp = resblockSpecial1(tmp, channels=ch*16, is_training=is_training, downsample=True, scope='resblock_3_' + str(i))
+
+            ########################################################################################################
+
+            x1 = batch_norm(tmp, is_training, scope='batch_norm')
+            x2 = tf.nn.leaky_relu(x1)
+            x3 = global_avg_pooling(x2)
+            logitMid = dropout(x3, is_training)
+            logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+
+        elif choice == 4:
+            '''改进三：'''
+            L28 = residual_block(tmp, channels=ch*8, is_training=is_training, downsample=True, scope='resblock_3_0')
+            c1  = ConvLayer(L28,3,3,256,512,is_training,strides=[1,2,2,1])
+            c1  = tf.nn.max_pool(c1,[1,2,2,1],strides=[1,2,2,1],padding='SAME')
+            c2  = ConvLayer(c1,7,7,512,1024,is_training,strides=[1,2,2,1],padding='VALID')
+            logitMid = dropout(c2, is_training)
+            logitFinal = fully_conneted(logitMid, units=num_class, scope='logitFinal')
+            ##
         endPoints = dict()
         endPoints['L224']  = L224
         endPoints['L112']  = L112
