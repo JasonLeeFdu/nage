@@ -78,7 +78,7 @@ def trainClsModel():
         # 构建网络
         logitsClass, predCls = conf.FUNC_HANDEL(image, trainSwitch)
         lossFunc = conf.LOSS_HANDLE( logitsClass, clsLabel)
-        # loadPretrainedResnetVGG19(sess)
+        loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
 
         # 正则化项
@@ -371,7 +371,7 @@ def trainTogether():
 
 
 def main():
-    trainTogether()
+    trainClsModel()
 
 
 

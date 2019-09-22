@@ -4,9 +4,9 @@ from network import *
 import datetime
 
 # For Training 函数名+时间
-FUNC_NAME = 'ResNet18EyeV1_1'
-LOSS_NAME = 'lossFunc'
-INFO = ''
+FUNC_NAME = 'vgg19LightClsV1'
+LOSS_NAME = 'focalLossOnlyCls'
+INFO = 'FOCAL'
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
@@ -46,8 +46,10 @@ VALIDATION_INTERVAL = 100
 GPU_FLAG = True
 GPUS = 0
 SEED = random.randint(1, 900000)
+
 LR_INTERVAL = 150000
 WEIGHT_DECAY= 3e-4# 1e-3 #0.000000
+
 MOMENTUM = 0.9
 PRELOAD = False
 
@@ -56,7 +58,7 @@ PRELOAD = False
 
 ## Hyper parameters concerning with training performance and Gradient Deminish or ex
 ## GRADIENT_CLIP = 0.1                     　# small
-LR = 1e-3#3                                　# small 0.0005
+LR = 1e-4#3                                　# small 0.0005
 BATCH_SIZE = 8                              # X
 VALTEST_BATCHSIZE = 24
 
