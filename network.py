@@ -295,7 +295,7 @@ def loadPretrainedResnetVGG19(sess):
     vgg_var_list = tf.global_variables('vgg_19')
     vgg_var_list = vgg_var_list[:-2]
     saver = tf.train.Saver(vgg_var_list)
-    saver.restore(sess, 'model/pretrained/vgg_19.ckpt')
+    saver.restore(sess, 'pretrainedMod/vgg_19.ckpt')
     print('Pretrained Loaded')
 
 # 限定函数
@@ -612,9 +612,10 @@ def ResNet18EyeV1_1(inp, trainingFlag):
         tf.summary.histogram('Resnet/logitFinal/dense/kernel:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/kernel:0'))
         tf.summary.histogram('Resnet/logitFinal/dense/bias:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/bias:0'))
     tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
-
-
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
+
+
+
 
 #######################################################################################
 
@@ -640,13 +641,15 @@ def ResNet18LightClsV1_1(inp, trainingFlag):
 
 
 
-### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月22号周日
 ### 测试比较vgg resnet性能
 ###
 def vgg19LightClsV1(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
         resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=2,is_training=trainingFlag)
-        logitsCls = endPoints['vgg_19/fc8']
+        logitsMid = endPoints['vgg_19/fc7']
+        # logitsCls = dropout(logitsCls,trainingFlag)
+        logitsCls = fully_conneted(logitsMid,units=2)
         pred = tf.argmax(logitsCls, axis=-1)
         return logitsCls, pred
 
