@@ -553,8 +553,6 @@ def ResNet18Eyev1(inp, trainingFlag):
         tf.summary.histogram('Resnet/logitFinal/dense/kernel:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/kernel:0'))
         tf.summary.histogram('Resnet/logitFinal/dense/bias:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/bias:0'))
     tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
-
-
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
@@ -614,8 +612,60 @@ def ResNet18EyeV1_1(inp, trainingFlag):
     tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
+### 实验版v1.2 功能：同时预测概率和部位  2019年9月22号周日
+### 从中介直接弄出来
+def ResNet18EyeV1_2(inp, trainingFlag):
+    endPoints = getRes18Dig(inp,conf.FIANL_CLASSES_NUM,2,trainingFlag)
+    L224 = endPoints['L224']
+    L112 = endPoints['L112']
+    L56 = endPoints['L56']
+    L28 = endPoints['L28']
+    logitFinal = endPoints['logitFinal']
 
+    with tf.name_scope('FPN_Pyramid'):
+        pipe224 = bridgeOriRes18(L224, trainingFlag)
+        pipe112 = ConvLayer(L112, 3, 3, 64, 32, trainingFlag)
+        pipe56 = ConvLayer(L56, 3, 3, 128, 64, trainingFlag)
+        pipe28 = ConvLayer(L28, 3, 3, 256, 128, trainingFlag)  # =>[None,28,28,128]
 
+        fm56New = tf.image.resize_images(pipe28, [56, 56], align_corners=True)
+        fm56New = ConvLayer(fm56New, 3, 3, 128, 64, trainingFlag)
+        out56 = fm56New + pipe56  # =>[None,56,56,64]
+        fm112New = tf.layers.conv2d_transpose(out56, 32, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
+        out112 = fm112New + pipe112  # =>[None,112,112,32]
+        fm224New = tf.layers.conv2d_transpose(out112, 16, 3, (2, 2), activation=tf.nn.relu, padding='SAME')
+        out224 = fm224New + pipe224  # =>[None,224,224,16]
+
+        # outward opts
+        logits_28 = ConvLayerNoRELU(pipe28, 3, 3, 128, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                              name='logits_28')
+        logits_56 = ConvLayerNoRELU(out56, 3, 3, 64, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                              name='logits_56')
+        logits_112 = ConvLayerNoRELU(out112, 3, 3, 32, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                               name='logits_112')
+        logits_224 = ConvLayerNoRELU(out224, 3, 3, 16, conf.FIANL_CLASSES_NUM, training=trainingFlag,
+                               name='logits_224')
+        logits_28_224 = tf.image.resize_images(logits_28,[224,224],align_corners=True)
+        logits_56_224 = tf.image.resize_images(logits_56,[224,224],align_corners=True)
+        logits_112_224 = tf.image.resize_images(logits_112,[224,224],align_corners=True)
+        concatedLogits = tf.concat([logits_28_224,logits_56_224,logits_112_224,logits_224],axis=-1)
+        logitMask = ConvLayerNoRELU(concatedLogits,1,1,4*conf.FIANL_CLASSES_NUM,conf.FIANL_CLASSES_NUM,trainingFlag)
+
+        logitsClass = tf.expand_dims(logitFinal, axis=1)
+        logitsClass = tf.expand_dims(logitsClass, axis=1)
+        predFlat = tf.argmax(logitMask, axis=3)
+        predVis = tf.nn.softmax(logitMask, axis=3)
+        predVis = predVis[:, :, :, 1]
+        predCls = tf.squeeze(tf.argmax(logitsClass, axis=3))
+
+        ## 观察网路的参数变化情况 -- 仅仅在网络内部加入histogram 观察参数分布的变化
+        dg = tf.get_default_graph()
+        tf.summary.histogram('logits_224/weights', dg.get_tensor_by_name('FPN_Pyramid/logits_224/weight:0'))
+        tf.summary.histogram('logits_224/bias', dg.get_tensor_by_name('FPN_Pyramid/logits_224/bias:0'))
+        tf.summary.histogram('Resnet/logitFinal/dense/kernel:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/kernel:0'))
+        tf.summary.histogram('Resnet/logitFinal/dense/bias:0', dg.get_tensor_by_name('Resnet/logitFinal/dense/bias:0'))
+    tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
+    return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 #######################################################################################
 
@@ -627,7 +677,6 @@ def ResNet18LightCls(inp, trainingFlag):
         logitsCls = getRes18Cls(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
     pred = tf.argmax(logitsCls,axis=-1)
     return  logitsCls,pred
-
 
 
 ### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
