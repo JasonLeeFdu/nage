@@ -26,7 +26,9 @@ from resTool.ResNetGen import *
 
 slim = tf.contrib.slim
 dbgList = list()
-
+vgg19_npy_path = '/home/winston/workSpace/PycharmProjects/NeijingAdv1/pretrainedMod/vgg19.npy'
+data_dict = np.load(vgg19_npy_path, encoding='latin1').item()
+x = 1
 '''#################################################################################
 
                             第一部分
@@ -37,8 +39,8 @@ dbgList = list()
 '''
 def ConvLayer(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='Conv2d'):
     with tf.name_scope(name):
-        weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
-        bias   = tf.Variable(tf.truncated_normal([outc],mean=0,stddev=1e-8),name='bias')
+        weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-1),name='weight')
+        bias   = tf.Variable(tf.constant(0, shape=[outc], dtype=tf.float32),name='bias')
         out    = tf.nn.conv2d(inp,weight,padding=padding,name='conv',strides=strides) + bias
         out    = tf.layers.batch_normalization(out,training=training,name=name + 'bn')
         out    = tf.nn.relu(out)
@@ -74,6 +76,95 @@ def bridgeConv1(inp,training,name='BridgeConv1'):
     with tf.name_scope(name):
         l2 = ConvLayer(inp, 3, 3, 64, 32, training, name='Conv2')
     return l2
+
+def get_conv_filter(name, trainable):
+    return tf.Variable(data_dict[name][0], trainable=trainable, name="filter")
+
+def get_bias(name, trainable):
+    return tf.Variable(data_dict[name][1], trainable=trainable, name="biases")
+
+def conv_layer(bottom, name, trainable=True):
+    with tf.variable_scope(name):
+        filt = get_conv_filter(name, trainable)
+
+        conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
+
+        conv_biases = get_bias(name, trainable)
+        bias = tf.nn.bias_add(conv, conv_biases)
+
+        relu = tf.nn.relu(bias)
+        return relu
+
+def getPretrainedVGG16(x):
+
+    with tf.variable_scope('saliency', reuse=tf.AUTO_REUSE):
+        # conv1_1 = conv2d(bgr, (3, 3), [64], training, name='conv1_1')
+        # conv1_2 = conv2d(conv1_1, (3, 3), [64], training, name='conv1_2')
+        # pool1 = pool2d(conv1_2,pool_size=(2,2),pool_stride=2,name='pool1')
+        conv1_1 = conv_layer(x, "conv1_1")
+        conv1_2 = conv_layer(conv1_1, "conv1_2")
+        pool1 = max_pool(conv1_2, 'pool1')
+
+        # conv2_1=conv2d(pool1, (3, 3), [128], training, name='conv2_1')
+        # conv2_2=conv2d(conv2_1, (3, 3), [128], training, name='conv2_2')
+        # pool2 = pool2d(conv2_2,pool_size=(2,2),pool_stride=2,name='pool2')
+        conv2_1 = conv_layer(pool1, "conv2_1")
+        conv2_2 = conv_layer(conv2_1, "conv2_2")
+        pool2 = max_pool(conv2_2, 'pool2')
+
+        # conv3_1 = conv2d(pool2, (3, 3), [256], training, name='conv3_1')
+        # conv3_2 = conv2d(conv3_1, (3, 3), [256], training, name='conv3_2')
+        # conv3_3 = conv2d(conv3_2, (3, 3), [256], training, name='conv3_3')
+        # pool3 = pool2d(conv3_3, pool_size=(2, 2), pool_stride=2, name='pool3')
+
+        conv3_1 = conv_layer(pool2, "conv3_1")
+        conv3_2 = conv_layer(conv3_1, "conv3_2")
+        conv3_3 = conv_layer(conv3_2, "conv3_3")
+        pool3 = max_pool(conv3_3, 'pool3')
+
+        # conv4_1 = conv2d(pool3, (3, 3), [512], training, name='conv4_1')
+        # conv4_2 = conv2d(conv4_1, (3, 3), [512], training, name='conv4_2')
+        # conv4_3 = conv2d(conv4_2, (3, 3), [512], training, name='conv4_3')
+        # pool4 = pool2d(conv4_3, pool_size=(2, 2), pool_stride=2, name='pool4')
+        conv4_1 = conv_layer(pool3, "conv4_1")
+        conv4_2 = conv_layer(conv4_1, "conv4_2")
+        conv4_3 = conv_layer(conv4_2, "conv4_3")
+        pool4 = max_pool(conv4_3, 'pool4')
+
+        # conv5_1 = conv2d(pool4, (3, 3), [512], training, name='conv5_1')
+        # conv5_2 = conv2d(conv5_1, (3, 3), [512], training, name='conv5_2')
+        # conv5_3 = conv2d(conv5_2, (3, 3), [512], training, name='conv5_3')
+        # pool5 = pool2d(conv5_3, pool_size=(3, 3), pool_stride=2, name='pool5')
+        conv5_1 = conv_layer(pool4, "conv5_1")
+        conv5_2 = conv_layer(conv5_1, "conv5_2")
+        conv5_3 = conv_layer(conv5_2, "conv5_3")
+        pool5 = max_pool(conv5_3, 'pool5')
+
+        res = dict()
+        res['pool1'] = pool1
+        res['pool2'] = pool2
+        res['pool3'] = pool3
+        res['pool4'] = pool4
+        res['pool5'] = pool5
+        return res
+
+def fc_layer(bottom, output, name, act=tf.nn.relu):
+    with tf.variable_scope(name):
+        shape = bottom.get_shape().as_list()
+        dim = 1
+        for d in shape[1:]:
+            dim *= d
+        x = tf.reshape(bottom, [-1, dim])
+        shape_W = [dim, output]
+        initial_W = tf.truncated_normal(shape_W, stddev=0.1, dtype=tf.float32)
+        W = tf.Variable(initial_W, dtype=tf.float32)
+        shape_b = [output]
+        initial_b = tf.constant(0, shape=shape_b, dtype=tf.float32)
+        b = tf.Variable(initial_b, dtype=tf.float32)
+    return act(tf.matmul(x, W) + b)
+
+def max_pool(bottom, name):
+    return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
 
 # 数量平衡过的二分类focalLoss，效果还不错
@@ -254,21 +345,39 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
     loss = tf.clip_by_value(loss,0,100.0)
     return loss
 
+def loss_Pre_class(pred, label):
+    flat_logits = tf.reshape(pred, [-1, tf.shape(pred)[0]])
+    flat_labels = tf.reshape(label, [-1, tf.shape(pred)[0]])
+    return tf.reduce_mean(tf.cast(tf.equal(flat_logits, flat_labels), tf.float32))
 
 def lossOnlyCls(logitsClass,gtLb):
-    # 二分类专用
+    # 二分类专用,验证无误
     gtLb = gtLb[:, :, :, :2]
-
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass_safe = clipSmall(logitsClass)
     Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
     #Loss_Cls = focalLoss(logitsClass_safe,gtLb)
-    precisionCls = precisionImage(logitsClass_safe, gtLb)
+    precisionCls = loss_Pre_class(logitsClass_safe, gtLb)
     tf.summary.scalar('Loss_Cls', Loss_Cls)
     tf.summary.scalar('Precision (classification)', precisionCls)
     return  Loss_Cls
 
+def lossOnlyClsOneBit(logitsClass,gtLb):
+    # 二分类专用
+    gtLb = gtLb[:, :, :, :2]
+    p = tf.squeeze(tf.sigmoid(logitsClass))
+    q = tf.squeeze(1-p)
+    logitsClass = tf.concat([p,q],axis=-1)
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass = tf.expand_dims(logitsClass,axis=1)
+    logitsClass_safe = clipSmall(logitsClass)
+    Loss_Cls = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=gtLb, logits=logitsClass_safe, dim=3))
+    #Loss_Cls = focalLoss(logitsClass_safe,gtLb)
+    precisionCls = loss_Pre_class(logitsClass_safe, gtLb)
+    tf.summary.scalar('Loss_Cls', Loss_Cls)
+    tf.summary.scalar('Precision (classification)', precisionCls)
+    return  Loss_Cls
 
 def focalLossOnlyCls(logitsClass,gtLb):
     # 二分类专用
@@ -283,6 +392,22 @@ def focalLossOnlyCls(logitsClass,gtLb):
     tf.summary.scalar('Precision (classification)', precisionCls)
     return  Loss_Cls
 
+def focal_loss(output, label):
+    label = label[:,:,:,1]
+    label = tf.squeeze(label,axis=-1)
+    label = tf.cast(tf.greater(label, 0.5), tf.float32)
+    p = tf.sigmoid(output)
+    pos_p = tf.multiply(p, label)
+    neg_p = tf.multiply((1.0 - p), (1.0 - label))
+    sum_p = pos_p + neg_p
+    final_p = tf.clip_by_value(sum_p, 1e-12, (1.0 - 1e-12))
+    final_log = tf.multiply(-1.0, tf.log(final_p))
+    final_loss = tf.multiply(0.25, tf.multiply((1.0 - final_p) ** 2, final_log))
+
+    precisionCls = loss_Pre_class(tf.cast(p > 0.5,tf.float32), label)
+    tf.summary.scalar('Precision (classification)', precisionCls)
+
+    return tf.reduce_sum(final_loss)
 
 '''#################################################################################
 
@@ -335,6 +460,7 @@ def clipSmall(logits):
 
    #################################################################################
 '''
+############################  整体系统  ###########################################################
 ### 娱乐版
 def ResNet50(inp,trainingFlag):
     with slim.arg_scope(nets.resnet_v2.resnet_arg_scope()):
@@ -564,8 +690,7 @@ def ResNet18Eyev1(inp, trainingFlag):
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
-
-### 娱乐版.1 功能：同时预测概率和部位  2019年9月21号周六
+### 尝试版.1 功能：同时预测概率和部位  2019年9月21号周六
 ### 修改每层提炼特征的卷积核心尺寸
 def ResNet18EyeV1_1(inp, trainingFlag):
     endPoints = getRes18(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
@@ -620,7 +745,7 @@ def ResNet18EyeV1_1(inp, trainingFlag):
     tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
-### 娱乐版v1.2 功能：同时预测概率和部位  2019年9月22号周日
+### 尝试版v1.2 功能：同时预测概率和部位  2019年9月22号周日
 ### 从中介直接弄出来
 def ResNet18EyeV1_2(inp, trainingFlag):
     endPoints = getRes18Dig(inp,conf.FIANL_CLASSES_NUM,2,trainingFlag)
@@ -675,9 +800,14 @@ def ResNet18EyeV1_2(inp, trainingFlag):
     tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
-#######################################################################################
+###########################  部分系统  ###########################################################
+'''
+1. 坏结构永远收敛不好
+2. 很小的细节容易造成大错误
+3. pretrain很重要，大约会提高7-8个百分点
 
-### 娱乐版 功能：对白光进行多多二分类初步筛选  2019年9月20号周五                             FINISHED
+'''
+### 尝试版 功能：对白光进行多多二分类初步筛选  2019年9月20号周五                             FINISHED
 ### 首次使用
 ### Neijing_Resnet18X64_CLS_20190920-A
 def ResNet18LightCls(inp, trainingFlag):
@@ -687,7 +817,7 @@ def ResNet18LightCls(inp, trainingFlag):
     return  logitsCls,pred
 
 
-### 娱乐版 功能：对白光进行二分类初步筛选  2019年9月21号周六
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
 ### 二分类与Focalloss
 ###
 def ResNet18LightClsV1_1(inp, trainingFlag):
@@ -697,7 +827,7 @@ def ResNet18LightClsV1_1(inp, trainingFlag):
     return  logitsCls,pred
 
 
-### 娱乐版 功能：对白光进行二分类初步筛选  2019年9月22号周日
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月22号周日
 ### 测试比较vgg resnet性能
 ###
 def vgg19LightClsV1(inp, trainingFlag):
@@ -709,48 +839,146 @@ def vgg19LightClsV1(inp, trainingFlag):
         pred = tf.argmax(logitsCls, axis=-1)
         return logitsCls, pred
 
+### 娱乐版 功能：分析牛之模型。
+def dssModel(input,  training):
+    # Convert RGB to BGR
+    red, green, blue = tf.split(input, 3, 3)
+
+    bgr = tf.concat([
+        blue,
+        green,
+        red
+    ], 3)
+
+
+
+    with tf.variable_scope('saliency', reuse=tf.AUTO_REUSE):
+        # conv1_1 = conv2d(bgr, (3, 3), [64], training, name='conv1_1')
+        # conv1_2 = conv2d(conv1_1, (3, 3), [64], training, name='conv1_2')
+        # pool1 = pool2d(conv1_2,pool_size=(2,2),pool_stride=2,name='pool1')
+        conv1_1 = conv_layer(bgr, "conv1_1")
+        conv1_2 = conv_layer(conv1_1, "conv1_2")
+        pool1 = max_pool(conv1_2, 'pool1')
+
+        # conv2_1=conv2d(pool1, (3, 3), [128], training, name='conv2_1')
+        # conv2_2=conv2d(conv2_1, (3, 3), [128], training, name='conv2_2')
+        # pool2 = pool2d(conv2_2,pool_size=(2,2),pool_stride=2,name='pool2')
+        conv2_1 = conv_layer(pool1, "conv2_1")
+        conv2_2 = conv_layer(conv2_1, "conv2_2")
+        pool2 = max_pool(conv2_2, 'pool2')
+
+        # conv3_1 = conv2d(pool2, (3, 3), [256], training, name='conv3_1')
+        # conv3_2 = conv2d(conv3_1, (3, 3), [256], training, name='conv3_2')
+        # conv3_3 = conv2d(conv3_2, (3, 3), [256], training, name='conv3_3')
+        # pool3 = pool2d(conv3_3, pool_size=(2, 2), pool_stride=2, name='pool3')
+
+        conv3_1 = conv_layer(pool2, "conv3_1")
+        conv3_2 = conv_layer(conv3_1, "conv3_2")
+        conv3_3 = conv_layer(conv3_2, "conv3_3")
+        pool3 = max_pool(conv3_3, 'pool3')
+
+        # conv4_1 = conv2d(pool3, (3, 3), [512], training, name='conv4_1')
+        # conv4_2 = conv2d(conv4_1, (3, 3), [512], training, name='conv4_2')
+        # conv4_3 = conv2d(conv4_2, (3, 3), [512], training, name='conv4_3')
+        # pool4 = pool2d(conv4_3, pool_size=(2, 2), pool_stride=2, name='pool4')
+        conv4_1 = conv_layer(pool3, "conv4_1")
+        conv4_2 = conv_layer(conv4_1, "conv4_2")
+        conv4_3 = conv_layer(conv4_2, "conv4_3")
+        pool4 = max_pool(conv4_3, 'pool4')
+
+
+        conv5_1 = conv_layer(pool4, "conv5_1")
+        conv5_2 = conv_layer(conv5_1, "conv5_2")
+        conv5_3 = conv_layer(conv5_2, "conv5_3")
+        pool5 = max_pool(conv5_3, 'pool5')
+
+
+        pool5_global = tf.reduce_mean(pool5, [1, 2])
+        fc1 = fc_layer(pool5_global, 4096, name='fc1', act=tf.nn.relu)
+        if training == True:
+            fc1 = tf.nn.dropout(fc1, 0.5)
+        fc2 = fc_layer(fc1, 1024, name='fc2', act=tf.nn.relu)
+
+
+        logitCls = fc_layer(fc2, 1, name='fc3', act=tf.identity)
+        pred = tf.argmax(logitCls, axis=-1)
+        return logitCls, pred
 
 
 ################################ COMMERCIAL #######################################################
 ### 尝试版 功能：对白光进行二分类初步筛选  2019年9月23号周一
 ###
-def VGG19CLS(x,trainingFlag):
+def VGG19CLS(x,trainingFlag,loadPretrained = True,sess = None):
+    red, green, blue = tf.split(x, 3, 3)
+    x = tf.concat([
+        blue,
+        green,
+        red
+    ], 3)
     with tf.variable_scope("VGG19CLS"):
-        conv1_1 = ConvLayerNoBN(x,3,3,3,64,training=trainingFlag,name='conv1_1')
-        conv1_2 = ConvLayerNoBN(conv1_1,3,3,64,64,training=trainingFlag,name='conv1_2')
+        conv1_1 =conv_layer(x, "conv1_1")
+        conv1_2 =conv_layer(conv1_1, "conv1_2")
         pool1   = tf.nn.max_pool(conv1_2,[1,2,2,1],[1,2,2,1],'VALID',name='pool1')
 
-        conv2_1 = ConvLayerNoBN(pool1,3,3,64,128,training=trainingFlag,name='conv2_1')
-        conv2_2 = ConvLayerNoBN(conv2_1,3,3,128,128,training=trainingFlag,name='conv2_2')
+        conv2_1 = conv_layer(pool1, "conv2_1")
+        conv2_2 = conv_layer(conv2_1, "conv2_2")
         pool2   = tf.nn.max_pool(conv2_2,[1,2,2,1],[1,2,2,1],'VALID',name='pool2')
 
-        conv3_1 = ConvLayerNoBN(pool2, 3, 3, 128, 256, training=trainingFlag, name='conv3_1')
-        conv3_2 = ConvLayerNoBN(conv3_1, 3, 3, 256, 256, training=trainingFlag, name='conv3_2')
-        conv3_3 = ConvLayerNoBN(conv3_2, 3, 3, 256, 256, training=trainingFlag, name='conv3_3')
-        conv3_4 = ConvLayerNoBN(conv3_3, 3, 3, 256, 256, training=trainingFlag, name='conv3_4')
+        conv3_1 = conv_layer(pool2, "conv3_1")
+        conv3_2 = conv_layer(conv3_1, "conv3_2")
+        conv3_3 = conv_layer(conv3_2, "conv3_3")
+        conv3_4 = conv_layer(conv3_3, "conv3_4")
         pool3   = tf.nn.max_pool(conv3_4,[1,2,2,1],[1,2,2,1],'VALID',name='pool3')
 
-        conv4_1 = ConvLayerNoBN(pool3, 3, 3, 256, 512, training=trainingFlag, name='conv4_1')
-        conv4_2 = ConvLayerNoBN(conv4_1, 3, 3, 512, 512, training=trainingFlag, name='conv4_2')
-        conv4_3 = ConvLayerNoBN(conv4_2, 3, 3, 512, 512, training=trainingFlag, name='conv4_3')
-        conv4_4 = ConvLayerNoBN(conv4_3, 3, 3, 512, 512, training=trainingFlag, name='conv4_4')
+        conv4_1 = conv_layer(pool3, "conv4_1")
+        conv4_2 = conv_layer(conv4_1, "conv4_2")
+        conv4_3 = conv_layer(conv4_2, "conv4_3")
+        conv4_4 = conv_layer(conv4_3, "conv4_4")
         pool4 = tf.nn.max_pool(conv4_4,[1,2,2,1],[1,2,2,1], 'VALID', name='pool4')
 
-
-        conv5_1 = ConvLayerNoBN(pool4, 3, 3, 512, 512, training=trainingFlag, name='conv5_1')
-        conv5_2 = ConvLayerNoBN(conv5_1, 3, 3, 512, 512, training=trainingFlag, name='conv5_2')
-        conv5_3 = ConvLayerNoBN(conv5_2, 3, 3, 512, 512, training=trainingFlag, name='conv5_3')
-        conv5_4 = ConvLayerNoBN(conv5_3, 3, 3, 512, 512, training=trainingFlag, name='conv5_4')
+        conv5_1 = conv_layer(pool4, "conv5_1")
+        conv5_2 = conv_layer(conv5_1, "conv5_2")
+        conv5_3 = conv_layer(conv5_2, "conv5_3")
+        conv5_4 = conv_layer(conv5_3, "conv5_4")
         pool5 = tf.nn.max_pool(conv5_4, [1,2,2,1],[1,2,2,1], 'VALID', name='pool4')
 
-        fc6 = avg_pooling(pool5)
-        fc7 = fully_conneted(fc6,units=4096,scope='fc6',is_training=trainingFlag)
-        fc7 = batch_norm(fc7, is_training=trainingFlag)
-        logitCls = fully_conneted(fc7, units=2,scope='logits',is_training=trainingFlag)
+        pool5AVG = global_avg_pooling(pool5)
+        fc6 = fc_layer(pool5AVG, 2048, name='fc6', act=tf.nn.relu)
+        fc6 = dropout(fc6, is_training=trainingFlag)
+        fc7 = fc_layer(fc6, 1024, name='fc7', act=tf.nn.relu)
+        logitCls = fc_layer(fc7, 1, name='logits', act=tf.identity)
+
         pred = tf.argmax(logitCls, axis=-1)
         return logitCls, pred
 
 
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月23号周一
+###
+def Resnet50CLS(inp,trainingFlag,loadPretrained = False,sess = None):
+    '''
+    red, green, blue = tf.split(inp, 3, 3)
+    inp = tf.concat([
+        blue,
+        green,
+        red
+    ], 3)
+    '''
+
+    with slim.arg_scope(nets.resnet_v2.resnet_arg_scope()):
+        resnet50,endPoints = nets.resnet_v2.resnet_v2_50(inp,num_classes=1,is_training=trainingFlag)
+        logitCls = endPoints['resnet_v2_50/logits']
+        pred = endPoints['predictions']
+        logitCls = tf.squeeze(tf.squeeze(logitCls,axis=-1),axis=-1)
+        pred = tf.squeeze(tf.squeeze(pred,axis=-1),axis=-1)
+        # load pretrain
+        if loadPretrained:
+            vgg_var_list = tf.global_variables('resnet_v2_50')
+            vgg_var_list = vgg_var_list[:-2]
+            saver = tf.train.Saver(vgg_var_list)
+            saver.restore(sess, 'pretrainedMod/resnet_v2_50.ckpt')
+            print('Resnet50v2 Pretrained Loaded')
+
+        return logitCls, pred
 
 
 def main():

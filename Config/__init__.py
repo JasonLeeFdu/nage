@@ -4,17 +4,19 @@ from network import *
 import datetime
 
 # For Training 函数名+时间
-FUNC_NAME = 'vgg19LightClsV1'
-LOSS_NAME = 'lossOnlyCls'
+FUNC_NAME = 'VGG19CLS'
+LOSS_NAME = 'focal_loss'
 INFO = ''
 
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
-LOAD_PRETRAIN = False
-LR_PRETRAIN_DIFFERENT = False
-PRETRAIN_SCOPE = 'vgg_19'
-FIANL_CLASSES_NUM = 5
+LOAD_PRETRAIN = True
+
+
+LR_PRETRAIN_DIFFERENT = True
+PRETRAIN_SCOPE = 'VGG19CLS' #'saliency'  #'VGG19CLS'  #'resnet_v2_50'
+
 
 
 
@@ -28,6 +30,7 @@ TRAIN_FN = os.path.join(DATASETS_PATH, 'Train.tfrecord')
 VAL_FN = os.path.join(DATASETS_PATH, 'Val.tfrecord')
 PRETRAINED_VGG19 = os.path.join(_PROJECT_BASEPATH,'/pretrainedMod/vgg_19.ckpt')
 PRETRAINED_Resnet50 = os.path.join(_PROJECT_BASEPATH,'/pretrainedMod/resnet_v2_50.ckpt')
+PRETRAINED_VGG19NPY = os.path.join(_PROJECT_BASEPATH,'/pretrainedMod/vgg16.npy')
 
 
 
@@ -63,7 +66,8 @@ PRELOAD = False
 
 ## Hyper parameters concerning with training performance and Gradient Deminish or ex
 ## GRADIENT_CLIP = 0.1                     　# small
-LR = 2e-5#3                                　# small 0.0005
+
+LR = 1e-4#3                                　# small 0.0005
 BATCH_SIZE = 8                              # X
 VALTEST_BATCHSIZE = 24
 

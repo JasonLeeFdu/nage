@@ -76,10 +76,13 @@ def trainClsModel():
         clsLabel = tf.placeholder_with_default(input=clsLabelTrainB, shape=[None, 1, 1, conf.FIANL_CLASSES_NUM])
 
         # 构建网络
-        logitsClass, predCls = conf.FUNC_HANDEL(image, trainSwitch)
+        logitsClass, predCls = conf.FUNC_HANDEL(image, trainSwitch,conf.LOAD_PRETRAIN,sess)
         lossFunction = conf.LOSS_HANDLE( logitsClass, clsLabel)
-        if conf.LOAD_PRETRAIN:
-            loadPretrainedResnetVGG19(sess)
+
+
+
+        #if conf.LOAD_PRETRAIN:
+        #    loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
 
         # 正则化项
@@ -116,10 +119,13 @@ def trainClsModel():
             weights_var_all = tf.trainable_variables()
             # weights_var_all_withoutNorm = [x for x in weights_var_all if ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
             weights_var_resnet = tf.trainable_variables(scope=conf.PRETRAIN_SCOPE)
+            weights_var_resnet = weights_var_resnet[:-6] # resnet50 weights_var_resnet[:-2]  # VGG19-weights_var_resnet[:-6]
             # weights_var_resnet_withoutNorm = [x for x in weights_var_resnet if ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
             weights_var_FPNBridge = [x for x in weights_var_all if x not in weights_var_resnet]
             # weights_var_FPNBridge_withoutNorm = [x for x in weights_var_all_withoutNorm if x not in weights_var_resnet_withoutNorm]
             var_list1 = weights_var_resnet  # 模型参数
+            #####################
+
             var_list2 = weights_var_FPNBridge
             opt1 = tf.train.AdamOptimizer(learning_rate / 10)
             optLr1 = opt1._lr
