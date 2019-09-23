@@ -4,9 +4,9 @@ from network import *
 import datetime
 
 # For Training 函数名+时间
-FUNC_NAME = 'vgg19LightClsV1'
-LOSS_NAME = 'focalLossOnlyCls'
-INFO = 'FOCAL'
+FUNC_NAME = 'ResNet18EyeV1_2'
+LOSS_NAME = 'lossFunc'
+INFO = ''
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
