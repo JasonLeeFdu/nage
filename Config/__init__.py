@@ -7,6 +7,7 @@ import datetime
 FUNC_NAME = 'vgg19LightClsV1'
 LOSS_NAME = 'lossOnlyCls'
 INFO = 'FOCAL'
+
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
@@ -53,6 +54,7 @@ GPUS = 0
 SEED = random.randint(1, 900000)
 LR_INTERVAL = 180000
 WEIGHT_DECAY= 1e-5# 1e-3 #0.000000
+
 MOMENTUM = 0.9
 PRELOAD = False
 
