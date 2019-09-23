@@ -40,7 +40,7 @@ def ConvLayer(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='C
         weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
         bias   = tf.Variable(tf.truncated_normal([outc],mean=0,stddev=1e-8),name='bias')
         out    = tf.nn.conv2d(inp,weight,padding=padding,name='conv',strides=strides) + bias
-        out    = tf.layers.batch_normalization(out,training=training)
+        out    = tf.layers.batch_normalization(out,training=training,name=name + 'bn')
         out    = tf.nn.relu(out)
     return out
 
@@ -249,6 +249,7 @@ def lossFunc(logits_28,logits_56,logits_112,logits_224, logitMask, logitsClass,g
 def lossOnlyCls(logitsClass,gtLb):
     # 二分类专用
     gtLb = gtLb[:, :, :, :2]
+
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass = tf.expand_dims(logitsClass,axis=1)
     logitsClass_safe = clipSmall(logitsClass)
@@ -298,6 +299,7 @@ def loadPretrainedResnetVGG19(sess):
     saver.restore(sess, 'pretrainedMod/vgg_19.ckpt')
     print('Pretrained Loaded')
 
+
 # 限定函数
 def clipSmall(logits):
     posLo = tf.cast(logits >= 0,tf.float32)
@@ -317,7 +319,7 @@ def clipSmall(logits):
 
                             第三部分
                             
-                          成熟的网络模型  
+                          尝试的网络模型  
                   
                   娱乐版->尝试版->实验版(V.x)->正式版/最终版(V.x.y)
 
@@ -375,7 +377,7 @@ def ResNet50(inp,trainingFlag):
             tf.summary.histogram('resnet_v2_50/logits/bias',dg.get_tensor_by_name('resnet_v2_50/logits/biases:0'))
         return logits_28,logits_56,logits_112,logits_224,logitsClass,predFlat,predCls,predVis
 
-### 尝试版
+### 娱乐版
 def vgg19Eye(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
         resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=conf.FIANL_CLASSES_NUM,is_training=trainingFlag)
@@ -435,7 +437,7 @@ def vgg19Eye(inp, trainingFlag):
 
         return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
-### 尝试版
+### 娱乐版
 def vgg16Eye(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
         resnet50, endPoints = nets.vgg.vgg_16(inp,num_classes=conf.FIANL_CLASSES_NUM,is_training=trainingFlag)
@@ -477,10 +479,6 @@ def vgg16Eye(inp, trainingFlag):
 
             logitsClass = endPoints['vgg_16/fc8']  # (5, 1, 1, 5)
 
-
-
-
-
             logitsClass = tf.expand_dims(logitsClass,axis=1)
             logitsClass = tf.expand_dims(logitsClass,axis=1)
             predFlat = tf.argmax(logitMask, axis=3)
@@ -500,7 +498,7 @@ def vgg16Eye(inp, trainingFlag):
             return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
 
-### 实验版v1 功能：同时预测概率和部位  2019年9月20号周五                                    FINISHED
+### 娱乐版 功能：同时预测概率和部位  2019年9月20号周五                                    FINISHED
 ### Neijing_Resnet18MapScore_20190920_Yuanshi-B
 def ResNet18Eyev1(inp, trainingFlag):
     endPoints = getRes18(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
@@ -557,7 +555,7 @@ def ResNet18Eyev1(inp, trainingFlag):
 
 
 
-### 实验版v1.1 功能：同时预测概率和部位  2019年9月21号周六
+### 娱乐版.1 功能：同时预测概率和部位  2019年9月21号周六
 ### 修改每层提炼特征的卷积核心尺寸
 def ResNet18EyeV1_1(inp, trainingFlag):
     endPoints = getRes18(inp,conf.FIANL_CLASSES_NUM,trainingFlag)
@@ -612,7 +610,7 @@ def ResNet18EyeV1_1(inp, trainingFlag):
     tf.summary.image('predVisBin', tf.expand_dims(tf.cast(predVis > 0.5,tf.float32),axis=-1))
     return logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis
 
-### 实验版v1.2 功能：同时预测概率和部位  2019年9月22号周日
+### 娱乐版v1.2 功能：同时预测概率和部位  2019年9月22号周日
 ### 从中介直接弄出来
 def ResNet18EyeV1_2(inp, trainingFlag):
     endPoints = getRes18Dig(inp,conf.FIANL_CLASSES_NUM,2,trainingFlag)
@@ -669,7 +667,7 @@ def ResNet18EyeV1_2(inp, trainingFlag):
 
 #######################################################################################
 
-### 尝试版 功能：对白光进行多多二分类初步筛选  2019年9月20号周五                             FINISHED
+### 娱乐版 功能：对白光进行多多二分类初步筛选  2019年9月20号周五                             FINISHED
 ### 首次使用
 ### Neijing_Resnet18X64_CLS_20190920-A
 def ResNet18LightCls(inp, trainingFlag):
@@ -679,7 +677,7 @@ def ResNet18LightCls(inp, trainingFlag):
     return  logitsCls,pred
 
 
-### 尝试版 功能：对白光进行二分类初步筛选  2019年9月21号周六
+### 娱乐版 功能：对白光进行二分类初步筛选  2019年9月21号周六
 ### 二分类与Focalloss
 ###
 def ResNet18LightClsV1_1(inp, trainingFlag):
@@ -689,18 +687,24 @@ def ResNet18LightClsV1_1(inp, trainingFlag):
     return  logitsCls,pred
 
 
-
-### 尝试版 功能：对白光进行二分类初步筛选  2019年9月22号周日
+### 娱乐版 功能：对白光进行二分类初步筛选  2019年9月22号周日
 ### 测试比较vgg resnet性能
 ###
 def vgg19LightClsV1(inp, trainingFlag):
     with slim.arg_scope(nets.vgg.vgg_arg_scope()):
-        resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=2,is_training=trainingFlag)
-        logitsMid = endPoints['vgg_19/fc7']
+        resnet50, endPoints = nets.vgg.vgg_19(inp,num_classes=2,is_training=trainingFlag,dropout_keep_prob=0.4)
+        logitsCls = endPoints['vgg_19/fc8']
         # logitsCls = dropout(logitsCls,trainingFlag)
-        logitsCls = fully_conneted(logitsMid,units=2)
+        # logitsCls = fully_conneted(logitsMid,units=2)
         pred = tf.argmax(logitsCls, axis=-1)
         return logitsCls, pred
+
+
+
+################################ COMMERCIAL #######################################################
+def VGG19CLS(x):
+    with tf.variable_scope("VGG19CLS"):
+        conv1_1 = ConvLayer(x,3,3,3,64)
 
 
 

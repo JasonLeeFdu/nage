@@ -77,8 +77,9 @@ def trainClsModel():
 
         # 构建网络
         logitsClass, predCls = conf.FUNC_HANDEL(image, trainSwitch)
-        lossFunc = conf.LOSS_HANDLE( logitsClass, clsLabel)
-        loadPretrainedResnetVGG19(sess)
+        lossFunction = conf.LOSS_HANDLE( logitsClass, clsLabel)
+        if conf.LOAD_PRETRAIN:
+            loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
 
         # 正则化项
@@ -90,7 +91,7 @@ def trainClsModel():
             weights_var_withoutNorm)
 
         # 统一loss
-        loss = lossFunc + l2NormLoss
+        loss = lossFunction + l2NormLoss
 
         # 记录哪一些重要的节点
         tf.summary.image("input", image)
@@ -103,22 +104,24 @@ def trainClsModel():
         # 不同层设置不同的学习率
         learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), conf.LR_INTERVAL, 0.1,
                                                    staircase=True)
-        if backbone_name == 'resnet18':
+        if not conf.LR_PRETRAIN_DIFFERENT:
             optimizer = tf.train.AdamOptimizer(learning_rate)
+            #optimizer = tf.train.MomentumOptimizer(learning_rate,0.9)
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)  # 为了保证bn 顺利工作
             with tf.control_dependencies(update_ops):
                 trainOpts = optimizer.minimize(loss, tf.train.get_or_create_global_step())
                 optLr2 = optimizer._lr
+                #optLr2 = loss
         else:
             weights_var_all = tf.trainable_variables()
             # weights_var_all_withoutNorm = [x for x in weights_var_all if ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
-            weights_var_resnet = tf.trainable_variables(scope='vgg_19')
+            weights_var_resnet = tf.trainable_variables(scope=conf.PRETRAIN_SCOPE)
             # weights_var_resnet_withoutNorm = [x for x in weights_var_resnet if ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
             weights_var_FPNBridge = [x for x in weights_var_all if x not in weights_var_resnet]
             # weights_var_FPNBridge_withoutNorm = [x for x in weights_var_all_withoutNorm if x not in weights_var_resnet_withoutNorm]
             var_list1 = weights_var_resnet  # 模型参数
             var_list2 = weights_var_FPNBridge
-            opt1 = tf.train.AdamOptimizer(learning_rate / 20)
+            opt1 = tf.train.AdamOptimizer(learning_rate / 10)
             optLr1 = opt1._lr
             opt2 = tf.train.AdamOptimizer(learning_rate)
             optLr2 = opt2._lr
@@ -232,7 +235,8 @@ def trainTogether():
         # 构建网络
         logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, predFlat, predCls, predVis = conf.FUNC_HANDEL(image,trainSwitch)
         networkLoss = conf.LOSS_HANDLE(logits_28, logits_56, logits_112, logits_224, logitMask, logitsClass, label, clsLabel, predVis)
-        # loadPretrainedResnetVGG19(sess)
+        if conf.LOAD_PRETRAIN:
+            loadPretrainedResnetVGG19(sess)
         # loadPretrainedResnetVGG19(sess)
 
         # 正则化项
