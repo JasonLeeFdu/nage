@@ -375,7 +375,7 @@ def trainTogether():
 
 
 def main():
-    trainTogether()
+    trainClsModel()
 
 
 

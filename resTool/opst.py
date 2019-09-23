@@ -15,7 +15,7 @@ weight_regularizer = tf_contrib.layers.l2_regularizer(0.0001)
 # Layer
 ##################################################################################
 
-def conv(x, channels, kernel=4, stride=2, padding='SAME', use_bias=True, scope='conv_0'):
+def conv(x, channels, kernel=4, stride=2, padding='SAME', use_bias=True, scope='conv'):
     with tf.variable_scope(scope):
         x = tf.layers.conv2d(inputs=x, filters=channels,
                              kernel_size=kernel, kernel_initializer=weight_init,
@@ -24,11 +24,10 @@ def conv(x, channels, kernel=4, stride=2, padding='SAME', use_bias=True, scope='
 
         return x
 
-def fully_conneted(x, units, use_bias=True, scope='fully_0'):
+def fully_conneted(x, units, is_training, use_bias=True, scope='fullyconneted'):
     with tf.variable_scope(scope):
         x = flatten(x)
         x = tf.layers.dense(x, units=units, kernel_initializer=weight_init, kernel_regularizer=weight_regularizer, use_bias=use_bias)
-
         return x
 
 def dropout(x,is_training,name='dropout'):

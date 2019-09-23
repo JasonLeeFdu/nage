@@ -6,7 +6,7 @@ import datetime
 # For Training 函数名+时间
 FUNC_NAME = 'vgg19LightClsV1'
 LOSS_NAME = 'lossOnlyCls'
-INFO = 'FOCAL'
+INFO = ''
 
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
@@ -63,7 +63,7 @@ PRELOAD = False
 
 ## Hyper parameters concerning with training performance and Gradient Deminish or ex
 ## GRADIENT_CLIP = 0.1                     　# small
-LR = 1e-5#3                                　# small 0.0005
+LR = 4e-5#3                                　# small 0.0005
 BATCH_SIZE = 8                              # X
 VALTEST_BATCHSIZE = 24
 

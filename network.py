@@ -44,6 +44,15 @@ def ConvLayer(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='C
         out    = tf.nn.relu(out)
     return out
 
+def ConvLayerNoBN(inp,h,w,inc,outc,training,padding='SAME',strides=[1,1,1,1],name='Conv2d'):
+    with tf.name_scope(name):
+        weight = tf.Variable(tf.truncated_normal([h,w,inc,outc],mean=0,stddev=1e-3),name='weight')
+        bias   = tf.Variable(tf.truncated_normal([outc],mean=0,stddev=1e-8),name='bias')
+        out    = tf.nn.conv2d(inp,weight,padding=padding,name='conv',strides=strides) + bias
+        out    = tf.layers.batch_normalization(out,training=training,name=name + 'bn')
+        out    = tf.nn.relu(out)
+    return out
+
 def ConvLayerD(inp,h,w,inc,outc,training,dilated = [1,1,1,1],padding='SAME',strides=[1,1,1,1],name='Conv2d'):
     with tf.name_scope(name):
         weight = tf.Variable(tf.truncated_normal([h, w, inc, outc], mean=0, stddev=1e-3), name='weight')
@@ -274,6 +283,7 @@ def focalLossOnlyCls(logitsClass,gtLb):
     tf.summary.scalar('Precision (classification)', precisionCls)
     return  Loss_Cls
 
+
 '''#################################################################################
 
                             第二部分
@@ -294,7 +304,7 @@ def loadPretrainedResnet50(sess):
 # 装载函数2
 def loadPretrainedResnetVGG19(sess):
     vgg_var_list = tf.global_variables('vgg_19')
-    vgg_var_list = vgg_var_list[:-2]
+    vgg_var_list = vgg_var_list[:-4]
     saver = tf.train.Saver(vgg_var_list)
     saver.restore(sess, 'pretrainedMod/vgg_19.ckpt')
     print('Pretrained Loaded')
@@ -702,9 +712,43 @@ def vgg19LightClsV1(inp, trainingFlag):
 
 
 ################################ COMMERCIAL #######################################################
-def VGG19CLS(x):
+### 尝试版 功能：对白光进行二分类初步筛选  2019年9月23号周一
+###
+def VGG19CLS(x,trainingFlag):
     with tf.variable_scope("VGG19CLS"):
-        conv1_1 = ConvLayer(x,3,3,3,64)
+        conv1_1 = ConvLayerNoBN(x,3,3,3,64,training=trainingFlag,name='conv1_1')
+        conv1_2 = ConvLayerNoBN(conv1_1,3,3,64,64,training=trainingFlag,name='conv1_2')
+        pool1   = tf.nn.max_pool(conv1_2,[1,2,2,1],[1,2,2,1],'VALID',name='pool1')
+
+        conv2_1 = ConvLayerNoBN(pool1,3,3,64,128,training=trainingFlag,name='conv2_1')
+        conv2_2 = ConvLayerNoBN(conv2_1,3,3,128,128,training=trainingFlag,name='conv2_2')
+        pool2   = tf.nn.max_pool(conv2_2,[1,2,2,1],[1,2,2,1],'VALID',name='pool2')
+
+        conv3_1 = ConvLayerNoBN(pool2, 3, 3, 128, 256, training=trainingFlag, name='conv3_1')
+        conv3_2 = ConvLayerNoBN(conv3_1, 3, 3, 256, 256, training=trainingFlag, name='conv3_2')
+        conv3_3 = ConvLayerNoBN(conv3_2, 3, 3, 256, 256, training=trainingFlag, name='conv3_3')
+        conv3_4 = ConvLayerNoBN(conv3_3, 3, 3, 256, 256, training=trainingFlag, name='conv3_4')
+        pool3   = tf.nn.max_pool(conv3_4,[1,2,2,1],[1,2,2,1],'VALID',name='pool3')
+
+        conv4_1 = ConvLayerNoBN(pool3, 3, 3, 256, 512, training=trainingFlag, name='conv4_1')
+        conv4_2 = ConvLayerNoBN(conv4_1, 3, 3, 512, 512, training=trainingFlag, name='conv4_2')
+        conv4_3 = ConvLayerNoBN(conv4_2, 3, 3, 512, 512, training=trainingFlag, name='conv4_3')
+        conv4_4 = ConvLayerNoBN(conv4_3, 3, 3, 512, 512, training=trainingFlag, name='conv4_4')
+        pool4 = tf.nn.max_pool(conv4_4,[1,2,2,1],[1,2,2,1], 'VALID', name='pool4')
+
+
+        conv5_1 = ConvLayerNoBN(pool4, 3, 3, 512, 512, training=trainingFlag, name='conv5_1')
+        conv5_2 = ConvLayerNoBN(conv5_1, 3, 3, 512, 512, training=trainingFlag, name='conv5_2')
+        conv5_3 = ConvLayerNoBN(conv5_2, 3, 3, 512, 512, training=trainingFlag, name='conv5_3')
+        conv5_4 = ConvLayerNoBN(conv5_3, 3, 3, 512, 512, training=trainingFlag, name='conv5_4')
+        pool5 = tf.nn.max_pool(conv5_4, [1,2,2,1],[1,2,2,1], 'VALID', name='pool4')
+
+        fc6 = avg_pooling(pool5)
+        fc7 = fully_conneted(fc6,units=4096,scope='fc6',is_training=trainingFlag)
+        fc7 = batch_norm(fc7, is_training=trainingFlag)
+        logitCls = fully_conneted(fc7, units=2,scope='logits',is_training=trainingFlag)
+        pred = tf.argmax(logitCls, axis=-1)
+        return logitCls, pred
 
 
 
