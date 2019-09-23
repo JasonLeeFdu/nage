@@ -151,6 +151,9 @@ def readAndDecode(filename, augmentation=True):
 
     image = _mean_image_subtraction(image, [_R_MEAN, _G_MEAN, _B_MEAN])
 
+
+
+
     return image, label, clsLabel
 
 
