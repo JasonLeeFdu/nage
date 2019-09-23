@@ -11,7 +11,7 @@ INFO = ''
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
-LOAD_PRETRAIN = True
+LOAD_PRETRAIN = False
 
 LR_PRETRAIN_DIFFERENT = True
 PRETRAIN_SCOPE = 'resnet_v2_50' #'saliency'  #'VGG19CLS'  #'resnet_v2_50'
