@@ -4,7 +4,7 @@ from network import *
 import datetime
 
 # For Training 函数名+时间
-FUNC_NAME = 'dssModel'
+FUNC_NAME = 'VGG19CLS'
 LOSS_NAME = 'focal_loss'
 INFO = ''
 
@@ -12,9 +12,9 @@ MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','')
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
 LOAD_PRETRAIN = True
+PRETRAIN_DECAY_RATE = 1e-6 # 0
 
-
-LR_PRETRAIN_DIFFERENT = False
+LR_PRETRAIN_DIFFERENT = True
 PRETRAIN_SCOPE = 'VGG19CLS' #'saliency'  #'VGG19CLS'  #'resnet_v2_50'
 
 
@@ -68,7 +68,7 @@ PRELOAD = False
 ## GRADIENT_CLIP = 0.1                     　# small
 
 LR = 1e-4#3                                　# small 0.0005
-BATCH_SIZE = 8                              # X
+BATCH_SIZE = 12                              # X
 VALTEST_BATCHSIZE = 24
 
 
