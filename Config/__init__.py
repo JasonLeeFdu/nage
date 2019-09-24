@@ -11,7 +11,7 @@ INFO = ''
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
-LOAD_PRETRAIN = True
+LOAD_PRETRAIN = False
 
 
 LR_PRETRAIN_DIFFERENT = True
@@ -44,7 +44,7 @@ STD_INPUT_W = 224
 MODEL_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','model') % MODEL_Name
 LOG_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','log') % MODEL_Name
 
-
+FIANL_CLASSES_NUM = 5
 NUM_WORKERS = 3
 MAX_Epoch = 101
 MAX_ITERATIONS = 2000000
@@ -55,8 +55,8 @@ VALIDATION_INTERVAL = 100
 GPU_FLAG = True
 GPUS = 0
 SEED = random.randint(1, 900000)
-LR_INTERVAL = 180000
-WEIGHT_DECAY= 1e-5# 1e-3 #0.000000
+LR_INTERVAL = 30000
+WEIGHT_DECAY= 3e-5# 1e-3 #0.000000
 
 MOMENTUM = 0.9
 PRELOAD = False

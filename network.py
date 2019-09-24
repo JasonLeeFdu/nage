@@ -915,6 +915,9 @@ def VGG19CLS(x,trainingFlag,loadPretrained = True,sess = None):
         green,
         red
     ], 3)
+
+
+
     with tf.variable_scope("VGG19CLS"):
         conv1_1 =conv_layer(x, "conv1_1")
         conv1_2 =conv_layer(conv1_1, "conv1_2")
