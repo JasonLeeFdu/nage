@@ -156,7 +156,7 @@ def fc_layer(bottom, output, name, act=tf.nn.relu):
             dim *= d
         x = tf.reshape(bottom, [-1, dim])
         shape_W = [dim, output]
-        initial_W = tf.truncated_normal(shape_W, stddev=0.1, dtype=tf.float32)
+        initial_W = tf.truncated_normal(shape_W, stddev=0.01, dtype=tf.float32)
         W = tf.Variable(initial_W, dtype=tf.float32)
         shape_b = [output]
         initial_b = tf.constant(0, shape=shape_b, dtype=tf.float32)

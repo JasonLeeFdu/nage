@@ -124,7 +124,7 @@ def trainClsModel():
             weights_var_all = tf.trainable_variables()
             # weights_var_all_withoutNorm = [x for x in weights_var_all if ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
             weights_var_resnet = tf.trainable_variables(scope=conf.PRETRAIN_SCOPE)
-            weights_var_resnet = weights_var_resnet[:-10] # resnet50 weights_var_resnet[:-2]  # VGG19-weights_var_resnet[:-6]
+            weights_var_resnet = weights_var_resnet[:-6] # resnet50 weights_var_resnet[:-2]  # VGG19-weights_var_resnet[:-6]
             # weights_var_resnet_withoutNorm = [x for x in weights_var_resnet if ((x.name.find('gamma') == -1) and (x.name.find('beta') == -1))]
             weights_var_FPNBridge = [x for x in weights_var_all if x not in weights_var_resnet]
             # weights_var_FPNBridge_withoutNorm = [x for x in weights_var_all_withoutNorm if x not in weights_var_resnet_withoutNorm]
