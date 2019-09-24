@@ -132,7 +132,7 @@ def trainClsModel():
             #####################
 
             var_list2 = weights_var_FPNBridge
-            opt1 = tf.train.AdamOptimizer(learning_rate * conf.DECAY_RATE)
+            opt1 = tf.train.AdamOptimizer(learning_rate * conf.PRETRAIN_DECAY_RATE)
             optLr1 = opt1._lr
             opt2 = tf.train.AdamOptimizer(learning_rate)
             optLr2 = opt2._lr

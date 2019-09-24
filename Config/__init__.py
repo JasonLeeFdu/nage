@@ -12,8 +12,10 @@ MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','')
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
 LOAD_PRETRAIN = True
-PRETRAIN_DECAY_RATE = 1e-6 # 0
+PRETRAIN_DECAY_RATE =  0 # 1e-6
 
+LR = 1e-4#3                                　# small 0.0005
+WEIGHT_DECAY= 1e-5 #0.000000
 LR_PRETRAIN_DIFFERENT = True
 PRETRAIN_SCOPE = 'VGG19CLS' #'saliency'  #'VGG19CLS'  #'resnet_v2_50'
 
@@ -56,7 +58,6 @@ GPU_FLAG = True
 GPUS = 0
 SEED = random.randint(1, 900000)
 LR_INTERVAL = 5000
-WEIGHT_DECAY= 0# 1e-3 #0.000000
 
 MOMENTUM = 0.9
 PRELOAD = False
@@ -67,7 +68,6 @@ PRELOAD = False
 ## Hyper parameters concerning with training performance and Gradient Deminish or ex
 ## GRADIENT_CLIP = 0.1                     　# small
 
-LR = 1e-4#3                                　# small 0.0005
 BATCH_SIZE = 12                              # X
 VALTEST_BATCHSIZE = 24
 
