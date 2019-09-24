@@ -163,6 +163,23 @@ def fc_layer(bottom, output, name, act=tf.nn.relu):
         b = tf.Variable(initial_b, dtype=tf.float32)
     return act(tf.matmul(x, W) + b)
 
+
+def fc_layerLoad(bottom, output, name, act=tf.nn.relu):
+    with tf.variable_scope(name):
+        shape = bottom.get_shape().as_list()
+        dim = 1
+        for d in shape[1:]:
+            dim *= d
+        x = tf.reshape(bottom, [-1, dim])
+        shape_W = [dim, output]
+        initial_W = tf.truncated_normal(shape_W, stddev=0.1, dtype=tf.float32)
+        W = tf.Variable(initial_W, dtype=tf.float32)
+        shape_b = [output]
+        initial_b = tf.constant(0, shape=shape_b, dtype=tf.float32)
+        b = tf.Variable(initial_b, dtype=tf.float32)
+    return act(tf.matmul(x, W) + b)
+
+
 def max_pool(bottom, name):
     return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
@@ -946,7 +963,7 @@ def VGG19CLS(x,trainingFlag,loadPretrained = True,sess = None):
         pool5 = tf.nn.max_pool(conv5_4, [1,2,2,1],[1,2,2,1], 'VALID', name='pool4')
 
         pool5AVG = global_avg_pooling(pool5)
-        fc6 = fc_layer(pool5AVG, 2048, name='fc6', act=tf.nn.relu)
+        fc6 = fc_layer(pool5AVG, 4096, name='fc6', act=tf.nn.relu)
         fc6 = dropout(fc6, is_training=trainingFlag)
         fc7 = fc_layer(fc6, 1024, name='fc7', act=tf.nn.relu)
         logitCls = fc_layer(fc7, 1, name='logits', act=tf.identity)

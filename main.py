@@ -105,8 +105,13 @@ def trainClsModel():
         globalStep = tf.Variable(0, name='global_step', trainable=False)
 
         # 不同层设置不同的学习率
-        learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), conf.LR_INTERVAL, 0.1,
+
+        #learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), conf.LR_INTERVAL, 0.1,
+        #                                          staircase=True)
+
+        learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), (conf.MAX_ITERATIONS / 40), 0.9,
                                                    staircase=True)
+
         if not conf.LR_PRETRAIN_DIFFERENT:
             optimizer = tf.train.AdamOptimizer(learning_rate)
             #optimizer = tf.train.MomentumOptimizer(learning_rate,0.9)
@@ -127,7 +132,7 @@ def trainClsModel():
             #####################
 
             var_list2 = weights_var_FPNBridge
-            opt1 = tf.train.AdamOptimizer(learning_rate / 10)
+            opt1 = tf.train.AdamOptimizer(learning_rate / 15)
             optLr1 = opt1._lr
             opt2 = tf.train.AdamOptimizer(learning_rate)
             optLr2 = opt2._lr
