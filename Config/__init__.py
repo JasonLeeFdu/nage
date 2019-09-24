@@ -4,7 +4,7 @@ from network import *
 import datetime
 
 # For Training 函数名+时间
-FUNC_NAME = 'VGG19CLS'
+FUNC_NAME = 'dssModel'
 LOSS_NAME = 'focal_loss'
 INFO = ''
 

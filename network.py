@@ -857,7 +857,7 @@ def vgg19LightClsV1(inp, trainingFlag):
         return logitsCls, pred
 
 ### 娱乐版 功能：分析牛之模型。
-def dssModel(input,  training):
+def dssModel(input,  training,loadPretrained = True,sess = None):
     # Convert RGB to BGR
     red, green, blue = tf.split(input, 3, 3)
 
@@ -866,8 +866,6 @@ def dssModel(input,  training):
         green,
         red
     ], 3)
-
-
 
     with tf.variable_scope('saliency', reuse=tf.AUTO_REUSE):
         # conv1_1 = conv2d(bgr, (3, 3), [64], training, name='conv1_1')
