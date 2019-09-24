@@ -161,7 +161,11 @@ def fc_layer(bottom, output, name, act=tf.nn.relu):
         shape_b = [output]
         initial_b = tf.constant(0, shape=shape_b, dtype=tf.float32)
         b = tf.Variable(initial_b, dtype=tf.float32)
-    return act(tf.matmul(x, W) + b)
+        if act is None:
+            res = tf.matmul(x, W) + b
+        else:
+            res = act(tf.matmul(x, W) + b)
+    return res
 
 
 def fc_layerLoad(bottom, output, name, act=tf.nn.relu):
@@ -961,10 +965,17 @@ def VGG19CLS(x,trainingFlag,loadPretrained = True,sess = None):
         pool5 = tf.nn.max_pool(conv5_4, [1,2,2,1],[1,2,2,1], 'VALID', name='pool4')
 
         pool5AVG = global_avg_pooling(pool5)
-        fc6 = fc_layer(pool5AVG, 4096, name='fc6', act=tf.nn.relu)
+        fc6 = fc_layer(pool5AVG, 4096, name='fc6', act=None)
+        fc6 = batch_norm(fc6,trainingFlag,scope='bn1')
+        fc6 = tf.nn.relu(fc6)
         fc6 = dropout(fc6, is_training=trainingFlag)
         fc7 = fc_layer(fc6, 1024, name='fc7', act=tf.nn.relu)
+        fc7 = batch_norm(fc7, trainingFlag, scope='bn2')
+        fc7 = tf.nn.relu(fc7)
+        fc7 = dropout(fc7, is_training=trainingFlag)
         logitCls = fc_layer(fc7, 1, name='logits', act=tf.identity)
+
+
 
         pred = tf.argmax(logitCls, axis=-1)
         return logitCls, pred
