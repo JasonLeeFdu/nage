@@ -12,10 +12,10 @@ MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','')
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
 LOAD_PRETRAIN = True
-PRETRAIN_DECAY_RATE =  0 # 1e-6
+PRETRAIN_DECAY_RATE =  1e-2 # 1e-6
 
-LR = 1e-4#3                                　# small 0.0005
-WEIGHT_DECAY= 1e-5 #0.000000
+LR = 1e-5#3                                　# small 0.0005
+WEIGHT_DECAY= 3e-5 #0.000000
 LR_PRETRAIN_DIFFERENT = True
 PRETRAIN_SCOPE = 'VGG19CLS' #'saliency'  #'VGG19CLS'  #'resnet_v2_50'
 
@@ -49,7 +49,7 @@ LOG_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','log') % MODEL_Na
 FIANL_CLASSES_NUM = 5
 NUM_WORKERS = 3
 MAX_Epoch = 101
-MAX_ITERATIONS = 40000
+MAX_ITERATIONS = 400000
 PRINT_INTERVAL = 50
 SAVE_INTERVAL = 1000
 SUMMARY_INTERVAL = 50
@@ -57,7 +57,7 @@ VALIDATION_INTERVAL = 100
 GPU_FLAG = True
 GPUS = 0
 SEED = random.randint(1, 900000)
-LR_INTERVAL = 5000
+LR_INTERVAL = 15000
 
 MOMENTUM = 0.9
 PRELOAD = False
