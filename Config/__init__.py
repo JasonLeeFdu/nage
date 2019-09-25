@@ -7,18 +7,18 @@ import datetime
 FUNC_NAME = 'VGG19CLS'
 LOSS_NAME = 'focal_loss'
 INFO = ''
-
 MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','').replace(' ','')+INFO
 FUNC_HANDEL = eval(FUNC_NAME)
 LOSS_HANDLE = eval(LOSS_NAME)
 LOAD_PRETRAIN = True
 PRETRAIN_DECAY_RATE =  0 #
 
-LR = 1e-3#3                                　# small 0.0005
-WEIGHT_DECAY= 1e-6 #0.000000
-LR_PRETRAIN_DIFFERENT = True
+LR = 1e-5#3                                　# small 0.0005
+LR_INTERVAL = 9000
+LR_DECAY_FACOTOR = 0.3
+WEIGHT_DECAY= 0 #0.000000
+LR_PRETRAIN_DIFFERENT = False
 PRETRAIN_SCOPE = 'VGG19CLS' #'saliency'  #'VGG19CLS'  #'resnet_v2_50'
-
 
 
 
@@ -57,7 +57,7 @@ VALIDATION_INTERVAL = 100
 GPU_FLAG = True
 GPUS = 0
 SEED = random.randint(1, 900000)
-LR_INTERVAL = 20000
+
 
 MOMENTUM = 0.9
 PRELOAD = False
@@ -67,7 +67,6 @@ PRELOAD = False
 
 ## Hyper parameters concerning with training performance and Gradient Deminish or ex
 ## GRADIENT_CLIP = 0.1                     　# small
-
 BATCH_SIZE = 12                              # X
 VALTEST_BATCHSIZE = 24
 

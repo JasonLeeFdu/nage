@@ -71,34 +71,6 @@ def data_augmentation(image,label,training=True):
 
         return image, mask
 
-def _mean_image_subtraction(image, means):
-  """Subtracts the given means from each image channel.
-  For example:
-    means = [123.68, 116.779, 103.939]
-    image = _mean_image_subtraction(image, means)
-  Note that the rank of `image` must be known.
-  Args:
-    image: a tensor of size [height, width, C].
-    means: a C-vector of values to subtract from each channel.
-  Returns:
-    the centered image.
-  Raises:
-    ValueError: If the rank of `image` is unknown, if `image` has a rank other
-      than three or if the number of channels in `image` doesn't match the
-      number of values in `means`.
-  """
-  if image.get_shape().ndims != 3:
-    raise ValueError('Input must be of size [height, width, C>0]')
-  num_channels = image.get_shape().as_list()[-1]
-  if len(means) != num_channels:
-    raise ValueError('len(means) must match the number of channels')
-
-  channels = tf.split(axis=2, num_or_size_splits=num_channels, value=image)
-  for i in range(num_channels):
-    channels[i] -= means[i]
-  return tf.concat(axis=2, values=channels)
-
-
 def readAndDecode(filename, augmentation=True):
 
     '''
@@ -126,9 +98,7 @@ def readAndDecode(filename, augmentation=True):
     clsLabel = features['clsLabel']
 
     # decode images and normalization for input
-    _R_MEAN = 123.68
-    _G_MEAN = 116.78
-    _B_MEAN = 103.94
+
     image = tf.decode_raw(image, tf.uint8)
     image = tf.reshape(image, [conf.SAMPLE_H, conf.SAMPLE_W, 3])
     image = tf.cast(image, tf.float32)
@@ -148,11 +118,6 @@ def readAndDecode(filename, augmentation=True):
         image, label = data_augmentation(image,label)
     else:
         pass
-
-    image = _mean_image_subtraction(image, [_R_MEAN, _G_MEAN, _B_MEAN])
-
-
-
 
     return image, label, clsLabel
 

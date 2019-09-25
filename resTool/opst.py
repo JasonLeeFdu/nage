@@ -156,10 +156,8 @@ def relu(x):
 ##################################################################################
 
 def batch_norm(x, is_training=True, scope='batch_norm'):
-    return tf_contrib.layers.batch_norm(x,
-                                        decay=0.9, epsilon=1e-05,
-                                        center=True, scale=True, updates_collections=None,
-                                        is_training=is_training, scope=scope)
+    return tf.layers.batch_normalization(x,training=is_training,name=scope)
+
 
 ##################################################################################
 # Loss function

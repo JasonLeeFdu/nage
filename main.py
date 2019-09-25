@@ -21,8 +21,68 @@ import recordMaker as rm
 from network import *
 import matplotlib.pyplot as plot
 import tensorflow.contrib.slim as slim
+import argparse
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_dir',
+                    default='data')
+
+parser.add_argument('--test_dir',
+                    default='data')
+
+parser.add_argument('--model_dir',
+                    default='model/multi_task_0812')
+
+parser.add_argument('--restore_dir',
+                    default='model/multi_task/model99.ckpt')
+
+parser.add_argument('--restore',
+                    default=False
+                    )
+
+parser.add_argument('--epochs',
+                    type=int,
+                    default=202)
+
+parser.add_argument('--peochs_per_eval',
+                    type=int,
+                    default=1)
+
+parser.add_argument('--logdir',
+                    default='model/multi_task_0812/logs')
+
+parser.add_argument('--batch_size',
+                    type=int,
+                    default=12)
+
+parser.add_argument('--is_cross_entropy',
+                    action='store_true',
+                    default=True)
+
+parser.add_argument('--learning_rate',
+                    type=float,
+                    default=1e-4)
+
+parser.add_argument('--decay_rate',
+                    type=float,
+                    default=0.316)
+
+
+parser.add_argument('--decay_step',
+                    type=int,
+                    default=50)
+
+parser.add_argument('--weight',
+                    nargs='+',
+                    type=float,
+                    default=[1.0,1.0])
+
+parser.add_argument('--random_seed',
+                    type=int,
+                    default=1234)
+
+flags = parser.parse_args()
 
 '''
 输入归一化的问题                            => done
@@ -106,9 +166,11 @@ def trainClsModel():
 
         # 不同层设置不同的学习率
 
-        learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), conf.LR_INTERVAL, 0.1,
+        learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), conf.LR_INTERVAL, conf.LR_DECAY_FACOTOR,
                                                   staircase=True)
-
+        #learning_rate = tf.train.exponential_decay(flags.learning_rate, globalStep,
+                                                   #tf.cast(2428 / flags.batch_size * flags.decay_step, tf.int32),
+                                                   #flags.decay_rate, staircase=True)
         #learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), (conf.MAX_ITERATIONS / 40), 0.9,
         #staircase=True)
 
