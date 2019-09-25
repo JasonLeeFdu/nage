@@ -156,7 +156,7 @@ def fc_layer(bottom, output, name, act=tf.nn.relu):
             dim *= d
         x = tf.reshape(bottom, [-1, dim])
         shape_W = [dim, output]
-        initial_W = tf.truncated_normal(shape_W, stddev=0.01, dtype=tf.float32)
+        initial_W = tf.truncated_normal(shape_W, stddev=0.1, dtype=tf.float32)
         W = tf.Variable(initial_W, dtype=tf.float32)
         shape_b = [output]
         initial_b = tf.constant(0, shape=shape_b, dtype=tf.float32)
@@ -935,8 +935,6 @@ def VGG19CLS(x,trainingFlag,loadPretrained = True,sess = None):
         red
     ], 3)
 
-
-
     with tf.variable_scope("VGG19CLS"):
         conv1_1 =conv_layer(x, "conv1_1")
         conv1_2 =conv_layer(conv1_1, "conv1_2")
@@ -969,7 +967,7 @@ def VGG19CLS(x,trainingFlag,loadPretrained = True,sess = None):
         fc6 = batch_norm(fc6,trainingFlag,scope='bn1')
         fc6 = tf.nn.relu(fc6)
         fc6 = dropout(fc6, is_training=trainingFlag)
-        fc7 = fc_layer(fc6, 1024, name='fc7', act=tf.nn.relu)
+        fc7 = fc_layer(fc6, 1024, name='fc7', act=None)
         fc7 = batch_norm(fc7, trainingFlag, scope='bn2')
         fc7 = tf.nn.relu(fc7)
         fc7 = dropout(fc7, is_training=trainingFlag)

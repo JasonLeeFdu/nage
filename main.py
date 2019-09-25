@@ -193,11 +193,11 @@ def trainClsModel():
                 saver.save(sess, os.path.join(conf.MODEL_PATH, 'model.ckpt'), global_step=iter1)
                 print(' ... Iter %d model2 saved! ' % iter1)
             ## summary
-            if (iter1 % conf.SUMMARY_INTERVAL == 0) and (iter1 != 0):  # 显示
+            if (iter1 % conf.SUMMARY_INTERVAL == 0) :  # 显示
                 trainWriter.add_summary(summ, iter1)
             ## test and summary
 
-            if (iter1 % conf.VALIDATION_INTERVAL == 0) and (iter1 != 0):  # 显示
+            if (iter1 % conf.VALIDATION_INTERVAL == 0):  # 显示
                 trainWriter.add_summary(summ, iter1)
                 ima, lab, cls = sess.run([imageValB, labelValB, clsLabelValB])
 
