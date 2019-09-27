@@ -279,7 +279,7 @@ def trainClsModel():
             if iter1 % conf.VALIDATION_INTERVAL == 0:  # 显示
                 trainWriter.add_summary(summ, iter1)
                 valLoss = 0.0
-                for i in range(iterPEpochTest):
+                for i in range(iterPEpochTest): 
                     ima, lab, cls = sess.run([imageValB, labelValB, clsLabelValB])
                     pc,lossData,summ = sess.run([precisionCls,loss, mergedSummOpt],
                                               feed_dict={trainSwitch: False, image: ima, label: lab,
