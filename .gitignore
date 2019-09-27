@@ -7,5 +7,5 @@ __pycache__/
 .idea/
 pretrainedMod/
 Config/__pycache__
-
-
+goodModel/
+Utils/__pycache__/

@@ -5,7 +5,8 @@ import skimage
 # tf
 import  tensorflow as tf
 import  tensorboard
-
+import matplotlib.pyplot as plt
+from skimage import transform,data
 
 
 
@@ -37,7 +38,7 @@ def _bytes_feature(value):
   return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
 
-def randomReshape(img):
+def randomResize(img):
     shapeFactor = tf.random_uniform([2], minval=0.7, maxval=1.3)
     shape = tf.cast(img.shape,tf.float32)[:-1]
     targetShape = tf.cast(tf.clip_by_value(shapeFactor * shape,230,23333),tf.int32)
@@ -46,30 +47,42 @@ def randomReshape(img):
 
 
 def adjustImage(img):
-    img = tf.image.random_brightness(img, max_delta=27. / 255.)
-    img = tf.image.random_contrast(img, lower=0.75, upper=1.3)
+    img = tf.image.random_brightness(img, max_delta=23. / 255.)
+    img = tf.image.random_contrast(img, lower=0.79, upper=1.3)
     return img
 
 def data_augmentation(image,label,training=True):
     if training:
         image_label = tf.concat([image,label],axis = -1)
 
+        # 放缩 随机旋转角度
         k = tf.random_uniform([], maxval=1.0)
-        image_label = tf.cond(tf.greater(k , 0.8),lambda:randomReshape(image_label),lambda: image_label )
+        maybe_flipped = tf.cond(tf.greater(k , 0.8),lambda:randomResize(image_label),
+                              lambda: tf.py_func(pyfunc_RandomRotate, [image_label], tf.float32))
+        # 转90°
         k = tf.random_uniform([], maxval=1.0)
-        image_label = tf.cond(tf.greater(k , 0.5),lambda:tf.image.rot90(image_label),lambda: image_label )
+        maybe_flipped = tf.cond(tf.greater(k , 0.5),lambda:tf.image.rot90(maybe_flipped),lambda: maybe_flipped )
 
-        maybe_flipped = tf.image.random_flip_left_right(image_label)
+        # 左右上下
+        maybe_flipped = tf.image.random_flip_left_right(maybe_flipped)
         maybe_flipped = tf.image.random_flip_up_down(maybe_flipped)
+
+        # 随机剪切
         maybe_flipped = tf.random_crop(maybe_flipped,size=[conf.STD_INPUT_H, conf.STD_INPUT_W, image_label.get_shape()[-1]])
 
+        # 拆分
         image = maybe_flipped[:, :, :3]
         mask = maybe_flipped[:, :, 3:]
 
+
+        # 调节图像的亮度与对比度
         k = tf.random_uniform([], maxval=1.0)
-        image = tf.cond(tf.greater(k, 0.8),lambda:adjustImage(image),lambda:image)
+        image = tf.cond(tf.greater(k, 0.7),lambda:adjustImage(image),lambda:image)
 
         return image, mask
+
+
+
 
 def readAndDecode(filename, augmentation=True):
 
@@ -231,10 +244,48 @@ def labelConverter(label,numCls):
     return newLabel
 
 
+
+def pyfunc_RandomRotate(imNMask):
+    angle = np.random.uniform(low=-20.0, high=20.0)
+    im = imNMask[:,:,:3]
+    mask = imNMask[:,:,3:]
+    imNew = transform.rotate(im, angle, resize=True)
+    maskNew = transform.rotate(mask, angle, resize=True)
+
+    targetEdgeLen = 300 / (np.sqrt(2) * np.sin(deg2arc(np.abs(angle) + 45)))
+    delta = np.maximum(int((imNew.shape[0] - targetEdgeLen) / 2),1)
+
+    tarImg = imNew[delta:-delta, delta:-delta, :]
+    tarMask = maskNew[delta:-delta, delta:-delta]
+    tarImg.astype(np.float32)
+
+    tarMask = tarMask > 0.5
+    tarMask = tarMask.astype(np.float32)
+
+    if len(tarMask.shape) == 2:
+        tarMask = np.expand_dims(tarMask, axis=-1)
+
+    res = np.concatenate([tarImg,tarMask],axis=-1)
+
+    return res.astype(np.float32)
+
+
+
 def main():
-    makeRecord()
+    #makeRecord
+    x = np.random.rand(300,300,8)
+    while True:
+        v = pyfunc_RandomRotate(x,)
 
 
+
+def arc2deg(arc):
+    coef = 180 / np.pi
+    return coef * arc
+
+def deg2arc(deg):
+    coef = np.pi / 180
+    return coef * deg
 
 if __name__ == '__main__':
     main()

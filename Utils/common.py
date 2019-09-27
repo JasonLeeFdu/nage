@@ -3,7 +3,7 @@ import Config as conf
 import pickle
 import io
 from thop import  profile
-
+import tensorflow as tf
 
 def securePath(path):
     pathList = list()
@@ -15,14 +15,10 @@ def securePath(path):
         os.mkdir(elem)
     return
 
-
-
 def secureSoftLink(src,dst):
     if not os.path.exists(dst):
         os.symlink(src,dst)
     return
-
-
 
 def saveCheckpoint(netModel, epoch, iterr, glbiter, fnCore='model'):
     ##net_state = netModel.state_dict()
@@ -37,7 +33,6 @@ def saveCheckpoint(netModel, epoch, iterr, glbiter, fnCore='model'):
     pfnFile = io.open(pfn, mode='wb')
     pickle.dump(res, pfnFile)
 
-
 def loadSpecificCheckpointNetState1(epoch, iterr, fnCore='model'):
     fn = fnCore + '_' + str(epoch) + '_' + str(iterr) + '.mdl'
     pfn = os.path.join(conf.MODEL_PATH, fn)
@@ -45,7 +40,6 @@ def loadSpecificCheckpointNetState1(epoch, iterr, fnCore='model'):
     net_state = res['NetState']
     globalIter = res['GlobalIter']
     return net_state, globalIter
-
 
 def loadLatestCheckpoint(fnCore='model'):
     # return net_status epoch iterr
@@ -71,7 +65,6 @@ def loadLatestCheckpoint(fnCore='model'):
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
-
 
 def loadModelsByPath(path):
     file = io.open(path, 'rb')
@@ -104,5 +97,21 @@ def sizeofNet(net,inputs):
 
     flops,params = profile(net,inputs=inputs)
     return flops,params
+
+
+
+def countTfRecordSamples(file_name):
+    sample_nums = 0
+    for record in tf.python_io.tf_record_iterator(file_name):
+        sample_nums += 1
+    return sample_nums
+
+def itersPerEpoch(sampelNum,bs):
+    return int(sampelNum / bs)
+
+def currentEpoch(curIter,iterPerEpoch):
+    return (curIter - 1) // iterPerEpoch + 1
+
+
 
 

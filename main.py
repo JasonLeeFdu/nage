@@ -118,6 +118,14 @@ def trainClsModel():
         coord = tf.train.Coordinator()
         imageTrain, labelTrain, clsLabelTrain = rm.readAndDecode(conf.TRAIN_FN)
         imageVal, labelVal, clsLabelVal = rm.readAndDecode(conf.VAL_FN)
+        smpNumTrain = tools.countTfRecordSamples(conf.TRAIN_FN)
+        smpNumVal = tools.countTfRecordSamples(conf.VAL_FN)
+        iterPEpochTrain = tools.itersPerEpoch(smpNumTrain,conf.BATCH_SIZE)
+        iterPEpochTest = tools.itersPerEpoch(smpNumVal,conf.VALTEST_BATCHSIZE)
+
+
+
+
         imageTrainB, labelTrainB, clsLabelTrainB = tf.train.shuffle_batch([imageTrain, labelTrain, clsLabelTrain],
                                                                           batch_size=conf.BATCH_SIZE,
                                                                           capacity=512,
@@ -137,7 +145,7 @@ def trainClsModel():
 
         # 构建网络
         logitsClass, predCls = conf.FUNC_HANDEL(image, trainSwitch,conf.LOAD_PRETRAIN,sess)
-        lossFunction = conf.LOSS_HANDLE( logitsClass, clsLabel)
+        lossFunction,precisionCls = conf.LOSS_HANDLE( logitsClass, clsLabel)
 
 
 
@@ -166,7 +174,7 @@ def trainClsModel():
 
         # 不同层设置不同的学习率
 
-        learning_rate = tf.train.exponential_decay(conf.LR, tf.train.get_or_create_global_step(), conf.LR_INTERVAL, conf.LR_DECAY_FACOTOR,
+        learning_rate = tf.train .exponential_decay(conf.LR, tf.train.get_or_create_global_step(), conf.LR_INTERVAL, conf.LR_DECAY_FACOTOR,
                                                   staircase=True)
         #learning_rate = tf.train.exponential_decay(flags.learning_rate, globalStep,
                                                    #tf.cast(2428 / flags.batch_size * flags.decay_step, tf.int32),
@@ -228,8 +236,17 @@ def trainClsModel():
         AvgFreq = 0
         Avgloss = 0
         mergedSummOpt = tf.summary.merge_all()
+        mI = 0;ctrl_1 = False
+        if conf.TRAIN_EPOCH_OR_ITERS == 'iter':
+            mI = conf.MAX_ITERATIONS
+            mE = tools.currentEpoch(conf.MAX_ITERATIONS, iterPEpochTrain)
 
-        for iter1 in np.arange(start_it, conf.MAX_ITERATIONS):
+        elif conf.TRAIN_EPOCH_OR_ITERS == 'epoch':
+            mI = conf.MAX_Epoch * iterPEpochTrain
+            mE = conf.MAX_Epoch
+
+        for iter1 in np.arange(start_it, mI+1):
+            ctrl_1 = True
             startTime = time.time()  # 统计
             _, lossData, lr2, summ = sess.run([trainOpts, loss, optLr2, mergedSummOpt],
                                               feed_dict={trainSwitch: True})  # 训练，注意sess.run 的第一个参数是一个fetch list
@@ -242,33 +259,45 @@ def trainClsModel():
             if (iter1 % conf.PRINT_INTERVAL == 0) and (iter1 != 0):  # 显示  gs
                 AvgFreq = (conf.PRINT_INTERVAL * conf.BATCH_SIZE) / AvgFreq
                 Avgloss = Avgloss / conf.PRINT_INTERVAL
-                # format_str = '%s: Iters %d, average loss(255) = %.7f, average frequency = %.3f(HZ), LR = %.10f'
-                format_str = '%s: Iters %d, average loss(255) = %.7f, average frequency = %.3f(HZ), LR = %.10f'
-                if iter1 % 1000 == 0:
-                    print(format_str % (datetime.now(), iter1, Avgloss, AvgFreq, lr2), end='')
+                epochTrain = tools.currentEpoch(iter1,iterPEpochTrain)
+                format_str = '%s: Epoch: %d(%d), Iters %d(%d), average loss(255) = %.7f, average frequency = %.3f(HZ), LR = %.10f'
+                if iter1 % conf.SAVE_INTERVAL == 0:
+                    print(format_str % (datetime.now(), epochTrain, mE, iter1, mI, Avgloss, AvgFreq, lr2), end='')
                 else:
-                    print(format_str % (datetime.now(), iter1, Avgloss, AvgFreq, lr2))
+                    print(format_str % (datetime.now(), epochTrain, mE, iter1, mI, Avgloss, AvgFreq, lr2))
                 AvgFreq = 0
                 Avgloss = 0
             ## 保存
             if (iter1 % conf.SAVE_INTERVAL == 0) and (iter1 != 0):  # 显示
                 saver.save(sess, os.path.join(conf.MODEL_PATH, 'model.ckpt'), global_step=iter1)
-                print(' ... Iter %d model2 saved! ' % iter1)
+                print(' ... Iter %d model saved! ' % iter1)
             ## summary
-            if (iter1 % conf.SUMMARY_INTERVAL == 0) :  # 显示
+            if iter1 % conf.SUMMARY_INTERVAL == 0 :  # 显示
                 trainWriter.add_summary(summ, iter1)
             ## test and summary
 
-            if (iter1 % conf.VALIDATION_INTERVAL == 0):  # 显示
+            if iter1 % conf.VALIDATION_INTERVAL == 0:  # 显示
                 trainWriter.add_summary(summ, iter1)
-                ima, lab, cls = sess.run([imageValB, labelValB, clsLabelValB])
+                valLoss = 0.0
+                for i in range(iterPEpochTest):
+                    ima, lab, cls = sess.run([imageValB, labelValB, clsLabelValB])
+                    pc,lossData,summ = sess.run([precisionCls,loss, mergedSummOpt],
+                                              feed_dict={trainSwitch: False, image: ima, label: lab,
+                                                         clsLabel: cls})  # 训练，注意sess.run 的第一个参数是一个fetch list
+                    valLoss += pc
+                    if i == 0:
+                        testWriter.add_summary(summ, iter1)
+                valLoss /= iterPEpochTest
+                epoch = tools.currentEpoch(iter1, iterPEpochTrain)
+                print('VALIDATION @ Epoch {},  Precision:{} '.format(epoch, valLoss))
 
-                lossData, summ = sess.run([loss, mergedSummOpt],
-                                          feed_dict={trainSwitch: False, image: ima, label: lab,
-                                                     clsLabel: cls})  # 训练，注意sess.run 的第一个参数是一个fetch list
-                testWriter.add_summary(summ, iter1)
+        if ctrl_1:
+            # When finish the last iteration
+            saver.save(sess, os.path.join(conf.MODEL_PATH, 'model.ckpt'), global_step=mI)
+            print(' Last model saved! Finish training.')
+        else:
+            print(' No iteration required. Already trained.')
 
-                # print('测试完毕')
         # close the queue reading threads// used for multi-queue readers
         coord.request_stop()
         coord.join(threads)
@@ -296,7 +325,10 @@ def trainTogether():
         imageValB, labelValB, clsLabelValB = tf.train.shuffle_batch([imageVal, labelVal, clsLabelVal], batch_size=conf.VALTEST_BATCHSIZE,
                                                                     capacity=512,
                                                                     min_after_dequeue=256,num_threads=3)
-
+        smpNumTrain = tools.countTfRecordSamples(conf.TRAIN_FN)
+        smpNumVal = tools.countTfRecordSamples(conf.VAL_FN)
+        iterPEpochTrain = tools.itersPerEpoch(smpNumTrain)
+        iterPEpochTest = tools.itersPerEpoch(smpNumVal)
         # 用于读取数据的多个线程(队列读取线程)的协调，否则会在线程暂停的时候报错
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
@@ -403,8 +435,16 @@ def trainTogether():
         Avgloss = 0
         mergedSummOpt = tf.summary.merge_all()
 
+        mI = 0
+        if conf.TRAIN_EPOCH_OR_ITERS == 'iter':
+            mI = conf.MAX_ITERATIONS
+            mE = tools.currentEpoch(conf.MAX_ITERATIONS,iterPEpochTrain)
 
-        for iter1 in np.arange(start_it,conf.MAX_ITERATIONS):
+        elif conf.TRAIN_EPOCH_OR_ITERS == 'epoch':
+            mI = conf.MAX_Epoch * iterPEpochTrain
+            mE = conf.TRAIN_EPOCH_OR_ITERS
+
+        for iter1 in np.arange(start_it,mI):
             startTime = time.time()  # 统计
             _,lossData,lr2,summ = sess.run([trainOpts, loss, optLr2,mergedSummOpt],feed_dict={trainSwitch:True})              #训练，注意sess.run 的第一个参数是一个fetch list
             endTime = time.time()
@@ -416,12 +456,12 @@ def trainTogether():
             if (iter1 % conf.PRINT_INTERVAL == 0) and (iter1 != 0):                          # 显示  gs
                 AvgFreq = (conf.PRINT_INTERVAL * conf.BATCH_SIZE) / AvgFreq
                 Avgloss = Avgloss / conf.PRINT_INTERVAL
-                # format_str = '%s: Iters %d, average loss(255) = %.7f, average frequency = %.3f(HZ), LR = %.10f'
-                format_str = '%s: Iters %d, average loss(255) = %.7f, average frequency = %.3f(HZ), LR = %.10f'
-                if iter1 % 1000 == 0:
-                    print(format_str % (datetime.now(), iter1, Avgloss, AvgFreq,lr2),end='')
+                epochTrain = tools.currentEpoch(iter1, iterPEpochTrain)
+                format_str = '%s: Epoch: %d(%d), Iters %d(%d), average loss(255) = %.7f, average frequency = %.3f(HZ), LR = %.10f'
+                if iter1 % conf.SAVE_INTERVAL == 0:
+                    print(format_str % (datetime.now(), epochTrain,mE, iter1,mI, Avgloss, AvgFreq, lr2), end='')
                 else:
-                    print(format_str % (datetime.now(), iter1, Avgloss, AvgFreq,lr2))
+                    print(format_str % (datetime.now(), epochTrain,mE, iter1, mI, Avgloss, AvgFreq, lr2))
                 AvgFreq = 0
                 Avgloss = 0
             ## 保存
@@ -442,10 +482,12 @@ def trainTogether():
                 testWriter.add_summary(summ,iter1)
 
                 # print('测试完毕')
+        # When finish the last iteration
+        saver.save(sess, os.path.join(conf.MODEL_PATH, 'model.ckpt'), global_step=mI)
+        print(' Last model saved! Finish training.')
         # close the queue reading threads// used for multi-queue readers
         coord.request_stop()
         coord.join(threads)
-
 
 def main():
     trainClsModel()

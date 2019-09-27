@@ -378,7 +378,7 @@ def lossFunc(logits_28, logits_56, logits_112, logits_224, logitMask, logitsClas
     tf.summary.scalar('z_IOU(CLS1)', iou1)
 
     loss = tf.clip_by_value(loss, 0, 100.0)
-    return loss
+    return loss,precisionCls
 
 
 def loss_Pre_class(pred, label):
@@ -398,7 +398,7 @@ def lossOnlyCls(logitsClass, gtLb):
     precisionCls = loss_Pre_class(logitsClass_safe, gtLb)
     tf.summary.scalar('Loss_Cls', Loss_Cls)
     tf.summary.scalar('Precision (classification)', precisionCls)
-    return Loss_Cls
+    return Loss_Cls,precisionCls
 
 
 def lossOnlyClsOneBit(logitsClass, gtLb):
@@ -415,7 +415,7 @@ def lossOnlyClsOneBit(logitsClass, gtLb):
     precisionCls = loss_Pre_class(logitsClass_safe, gtLb)
     tf.summary.scalar('Loss_Cls', Loss_Cls)
     tf.summary.scalar('Precision (classification)', precisionCls)
-    return Loss_Cls
+    return Loss_Cls,precisionCls
 
 
 def focalLossOnlyCls(logitsClass, gtLb):
@@ -429,7 +429,7 @@ def focalLossOnlyCls(logitsClass, gtLb):
     precisionCls = precisionImage(logitsClass_safe, gtLb)
     tf.summary.scalar('Loss_Cls', Loss_Cls)
     tf.summary.scalar('Precision (classification)', precisionCls)
-    return Loss_Cls
+    return Loss_Cls,precisionCls
 
 
 def focal_loss(output, label):
@@ -447,7 +447,7 @@ def focal_loss(output, label):
     precisionCls = loss_Pre_class(tf.cast(p > 0.5, tf.float32), label)
     tf.summary.scalar('Precision (classification)', precisionCls)
 
-    return tf.reduce_sum(final_loss)
+    return tf.reduce_sum(final_loss),precisionCls
 
 
 '''#################################################################################
@@ -1047,6 +1047,7 @@ def VGG16CLS(x, trainingFlag, loadPretrained=True, sess=None):
         fc1 = fc_layer(pool5_global, 4096, name='fc1', act=tf.nn.relu, training=trainingFlag)
         fc1 = tf.nn.dropout(fc1, 0.5)
         fc2 = fc_layer(fc1, 1024, name='fc2', act=tf.nn.relu, training=trainingFlag)
+        fc2 = tf.nn.dropout(fc2, 0.5)
         logitCls = fc_layer(fc2, 1, name='fc3', act=tf.identity, bn=False, training=trainingFlag)
         pred = tf.argmax(logitCls, axis=-1)
         return logitCls, pred
@@ -1075,7 +1076,6 @@ def Resnet50CLS(inp, trainingFlag, loadPretrained=False, sess=None):
             saver = tf.train.Saver(vgg_var_list)
             saver.restore(sess, 'pretrainedMod/resnet_v2_50.ckpt')
             print('Resnet50v2 Pretrained Loaded')
-
         return logitCls, pred
 
 
@@ -1083,7 +1083,6 @@ def main():
     g = tf.Graph()
     # 构建一张计算图
     with g.as_default():
-        # N W H C
         x = tf.placeholder(dtype=tf.float32, shape=[None, 224, 224, 3])
         f = tf.placeholder(dtype=tf.bool, shape=[])
         gtImg = tf.clip_by_value(tf.random_normal([5, 224, 224, conf.FIANL_CLASSES_NUM]), 0, 1)
