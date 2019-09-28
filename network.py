@@ -1194,7 +1194,7 @@ def lossVGGMaskLoss(lev1,lev2,lev3,lev4,fusedSingleClsPred,fusedMultiClsPred,gtM
     a = fusedSingleClsPred[:, :, :, 1]
     a = tf.cast((tf.sigmoid(a) > 0.5),tf.float32)
     b = tf.argmax(fusedMultiClsPred,axis=-1)
-    b = tf.cast(b == 1,tf.float32)
+    b = tf.cast(tf.equal(b,1),tf.float32)
     iou1 = IOU(a, gtMask[:, :, :, 1])
     iou2 = IOU(b, gtMask[:, :, :, 1])
 
