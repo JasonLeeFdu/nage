@@ -10,9 +10,9 @@ import Utils.common as comm
 ###################################################################################################
 '''
 ## 调用模型的名称
-FUNC_NAME = 'Resnet50CLS'
+FUNC_NAME = 'VGG16MASK'
 ## 损失函数的名称
-LOSS_NAME = 'focal_loss'
+LOSS_NAME = 'lossVGGMaskLoss'
 ## 辅助信息的显示
 INFO = ''
 ## 模型训练文件的后缀
@@ -21,11 +21,17 @@ MODEL_Name = FUNC_NAME + '_' + str(datetime.datetime.now())[:13].replace('-','')
 FUNC_HANDEL = eval(FUNC_NAME)
 ## 损失函数的句柄
 LOSS_HANDLE = eval(LOSS_NAME)
+
 ## 是否提前载入预训练模型
 LOAD_PRETRAIN = True
+## 针对是否是预训练模型，设置不同的学习率
+LR_PRETRAIN_DIFFERENT = False
 ## 预训练模型的学习率的减小
 PRETRAIN_DECAY_RATE =  0
-
+## 预训练模型的scope名称
+PRETRAIN_SCOPE = 'resnet_v2_50'                 #'saliency'      #'VGG19CLS'  #'resnet_v2_50'
+## 微调保留层数
+RESERVE_LEVEL = 4
 
 
 '''################################################################################################
@@ -34,19 +40,15 @@ PRETRAIN_DECAY_RATE =  0
 #################################################################################################
 '''
 ## 学习率
-LR = 1e-4#3
+LR = 1e-3#3
 ## 学习率下降间隔
 LR_INTERVAL = 2000
 ## 学习率下降的比率
-LR_DECAY_FACOTOR = 0.80
+LR_DECAY_FACOTOR = 0.9
 ## L2 正则约束系数
-WEIGHT_DECAY= 0 #0.000000
-## 针对是否是预训练模型，设置不同的学习率
-LR_PRETRAIN_DIFFERENT = False
-## 预训练模型的scope名称
-PRETRAIN_SCOPE = 'Resnet50CLS'                 #'saliency'      #'VGG19CLS'  #'resnet_v2_50'
+WEIGHT_DECAY= 0#0.000000
 ## 批训练大小，训练
-BATCH_SIZE = 12
+BATCH_SIZE = 8
 ## 批训练大小，测试
 VALTEST_BATCHSIZE = 24
 ## 梯度剪切
@@ -59,7 +61,7 @@ TRAIN_EPOCH_OR_ITERS = 'epoch'              # 'epoch','iter'
 ## 加载模型所用的线程数
 NUM_WORKERS = 3
 ## 最大训练EPOCH次数
-MAX_Epoch = 500
+MAX_Epoch = 1000
 ## 最大训练迭代数目
 MAX_ITERATIONS = 65000
 ## 冲量

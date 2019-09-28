@@ -40,13 +40,16 @@ x = 1
 '''
 
 
-def ConvLayer(inp, h, w, inc, outc, training, padding='SAME', strides=[1, 1, 1, 1], name='Conv2d'):
+def ConvLayer(inp, h, w, inc, outc, training, padding='SAME', strides=[1, 1, 1, 1], act = tf.nn.relu, name='Conv2d'):
     with tf.name_scope(name):
         weight = tf.Variable(tf.truncated_normal([h, w, inc, outc], mean=0, stddev=1e-1), name='weight')
         bias = tf.Variable(tf.constant(0, shape=[outc], dtype=tf.float32), name='bias')
         out = tf.nn.conv2d(inp, weight, padding=padding, name='conv', strides=strides) + bias
         out = tf.layers.batch_normalization(out, training=training, name=name + 'bn')
-        out = tf.nn.relu(out)
+        if act is None:
+            pass
+        else:
+            out =act(out)
     return out
 
 
@@ -68,15 +71,6 @@ def ConvLayerD(inp, h, w, inc, outc, training, dilated=[1, 1, 1, 1], padding='SA
         out = tf.nn.atrous_conv2d(inp, weight, 2, padding='SAME') + bias
         out = tf.layers.batch_normalization(out, training=training)
         out = tf.nn.relu(out)
-    return out
-
-
-def ConvLayerNoRELU(inp, h, w, inc, outc, training, padding='SAME', strides=[1, 1, 1, 1], name='Conv2d'):
-    with tf.name_scope(name):
-        weight = tf.Variable(tf.truncated_normal([h, w, inc, outc], mean=0, stddev=1e-3), name='weight')
-        bias = tf.Variable(tf.truncated_normal([outc], mean=0, stddev=1e-8), name='bias')
-        out = tf.nn.conv2d(inp, weight, padding=padding, name='conv', strides=strides) + bias
-        out = tf.layers.batch_normalization(out, training=training)
     return out
 
 
@@ -955,6 +949,30 @@ def dssModel(input, training, loadPretrained=True, sess=None):
         pred = tf.argmax(logitCls, axis=-1)
         return logitCls, pred
 
+### 娱乐版 功能：对白光进行二分类初步筛选  2019年9月23号周一
+###
+def Resnet50CLS(inp, trainingFlag, loadPretrained=False, sess=None):
+    red, green, blue = tf.split(inp, 3, 3)
+    rgb = tf.concat([
+        red - 123.68,
+        green-116.78,
+        blue - 103.94
+    ], 3)
+    with slim.arg_scope(nets.resnet_v2.resnet_arg_scope()):
+        resnet50, endPoints = nets.resnet_v2.resnet_v2_50(rgb, num_classes=1, is_training=trainingFlag)
+        logitCls = endPoints['resnet_v2_50/logits']
+        pred = endPoints['predictions']
+        logitCls = tf.squeeze(tf.squeeze(logitCls, axis=-1), axis=-1)
+        pred = tf.squeeze(tf.squeeze(pred, axis=-1), axis=-1)
+        # load pretrain
+        if loadPretrained:
+            vgg_var_list = tf.global_variables('resnet_v2_50')
+            vgg_var_list = vgg_var_list[:-2]
+            saver = tf.train.Saver(vgg_var_list)
+            saver.restore(sess, 'pretrainedMod/resnet_v2_50.ckpt')
+            print('Resnet50v2 Pretrained Loaded')
+        return logitCls, pred
+
 
 ################################ COMMERCIAL #######################################################
 ### 尝试版 功能：对白光进行二分类初步筛选  2019年9月23号周一
@@ -1054,29 +1072,152 @@ def VGG16CLS(x, trainingFlag, loadPretrained=True, sess=None):
 
 
 
-### 尝试版 功能：对白光进行二分类初步筛选  2019年9月23号周一
-###
-def Resnet50CLS(inp, trainingFlag, loadPretrained=False, sess=None):
-    red, green, blue = tf.split(inp, 3, 3)
-    rgb = tf.concat([
-        red - 123.68,
-        green-116.78,
-        blue - 103.94
+def deconv(inpu,kernels,filtersize,trainFlag,stride=(2,2),padding='SAME',activation= tf.nn.relu,name='Deconv'):
+    with tf.variable_scope(name):
+        c1 = tf.layers.conv2d_transpose(inpu, kernels, filtersize, stride, activation=None, padding=padding, name='deconv')
+        c2 = tf.layers.batch_normalization(c1, training=trainFlag, name='bn')
+        if activation is not None:
+            c3 = activation(c2)
+    return c3
+
+def resMod(inp,c,train,name='Resmod'):
+    with tf.variable_scope(name):
+        conv1 = ConvLayer(inp,3,3,c,c,train,name='conv1')
+        conv2 = ConvLayer(conv1,3,3,c,c,train,name='conv2')
+        conv3 = ConvLayer(inp + conv2,3,3,c,conf.FIANL_CLASSES_NUM,train,name='conv3',act=None)
+    return conv3
+
+
+
+def VGG16MASK(x, trainingFlag, loadPretrained=True, sess=None):
+    red, green, blue = tf.split(x, 3, 3)
+    bgr = tf.concat([
+        blue - 103.939,
+        green - 116.779,
+        red - 123.68
     ], 3)
-    with slim.arg_scope(nets.resnet_v2.resnet_arg_scope()):
-        resnet50, endPoints = nets.resnet_v2.resnet_v2_50(rgb, num_classes=1, is_training=trainingFlag)
-        logitCls = endPoints['resnet_v2_50/logits']
-        pred = endPoints['predictions']
-        logitCls = tf.squeeze(tf.squeeze(logitCls, axis=-1), axis=-1)
-        pred = tf.squeeze(tf.squeeze(pred, axis=-1), axis=-1)
-        # load pretrain
-        if loadPretrained:
-            vgg_var_list = tf.global_variables('resnet_v2_50')
-            vgg_var_list = vgg_var_list[:-2]
-            saver = tf.train.Saver(vgg_var_list)
-            saver.restore(sess, 'pretrainedMod/resnet_v2_50.ckpt')
-            print('Resnet50v2 Pretrained Loaded')
-        return logitCls, pred
+
+    with tf.variable_scope("VGG19CLS"):
+        conv1_1 = conv_layer(bgr, "conv1_1")
+        conv1_2 = conv_layer(conv1_1, "conv1_2")
+        pool1 = tf.nn.max_pool(conv1_2, [1, 2, 2, 1], [1, 2, 2, 1], 'VALID', name='pool1')#(?, 112, 112, 64)
+
+        conv2_1 = conv_layer(pool1, "conv2_1")
+        conv2_2 = conv_layer(conv2_1, "conv2_2")
+        pool2 = tf.nn.max_pool(conv2_2, [1, 2, 2, 1], [1, 2, 2, 1], 'VALID', name='pool2')#(?, 56, 56, 128)
+
+        conv3_1 = conv_layer(pool2, "conv3_1")
+        conv3_2 = conv_layer(conv3_1, "conv3_2")
+        conv3_3 = conv_layer(conv3_2, "conv3_3")
+        conv3_4 = conv_layer(conv3_3, "conv3_4")
+        pool3 = tf.nn.max_pool(conv3_4, [1, 2, 2, 1], [1, 2, 2, 1], 'VALID', name='pool3')#(?, 28, 28, 256)
+
+        conv4_1 = conv_layer(pool3, "conv4_1")
+        conv4_2 = conv_layer(conv4_1, "conv4_2")
+        conv4_3 = conv_layer(conv4_2, "conv4_3")
+        conv4_4 = conv_layer(conv4_3, "conv4_4")
+        pool4 = tf.nn.max_pool(conv4_4, [1, 2, 2, 1], [1, 2, 2, 1], 'VALID', name='pool4')#(?, 14, 14, 512)
+
+        conv5_1 = conv_layer(pool4, "conv5_1")
+        conv5_2 = conv_layer(conv5_1, "conv5_2")
+        conv5_3 = conv_layer(conv5_2, "conv5_3")
+        conv5_4 = conv_layer(conv5_3, "conv5_4")
+
+        with tf.variable_scope('FPN'):
+            conv5_4_ = ConvLayer(conv5_4, 1, 1, 512, 256, trainingFlag,name='conv5_4_')
+            conv4_4_ = ConvLayer(conv4_4, 1, 1, 512, 256, trainingFlag,name='conv4_4_')
+            conv3_4_ = ConvLayer(conv3_4,1,1,256,128,trainingFlag,name='conv3_4_')
+            conv2_2_ = ConvLayer(conv2_2,1,1,128,64,trainingFlag,name='conv2_2_')
+            conv1_2_ = ConvLayer(conv1_2,1,1,64,32,trainingFlag,name='conv1_2_')
+            add4    = deconv(conv5_4_,256,3,trainingFlag,name='dc512')
+            lev4_    = add4 + conv4_4_
+            add3    = deconv(lev4_,128,3,trainingFlag,name='dc256')
+            lev3_    = conv3_4_ + add3
+            add2    = deconv(lev3_,64,3,trainingFlag,name='dc128')
+            lev2_    = conv2_2_ + add2
+            add1    = deconv(lev2_,32,3,trainingFlag,name='dc64')
+            lev1_    = tf.add(conv1_2_ ,add1,name='lev1_')
+
+            lev1 = resMod(lev1_,32,trainingFlag,name='lev1')                                                        #=>
+            lev2 = tf.image.resize_bicubic(resMod(lev2_,64,trainingFlag,name='lev2'),[224,224],align_corners=True) #=>
+            lev3 = tf.image.resize_bicubic(resMod(lev3_,128,trainingFlag,name='lev3'),[224,224],align_corners=True) #=>
+            lev4 = tf.image.resize_bicubic(resMod(lev4_,256,trainingFlag,name='lev4'),[224,224],align_corners=True) #=>
+
+            l = list()
+            for i in range(conf.FIANL_CLASSES_NUM):
+                # 第i类
+                li = list()
+                li.append(tf.expand_dims(lev1[:,:,:,i],axis=-1))
+                li.append(tf.expand_dims(lev2[:,:,:,i],axis=-1))
+                li.append(tf.expand_dims(lev3[:,:,:,i],axis=-1))
+                li.append(tf.expand_dims(lev4[:,:,:,i],axis=-1))
+                t = tf.concat(li,axis=-1)
+                tt = ConvLayer(tf.nn.relu(t),1,1,4,1,trainingFlag,name='fuse_'+str(i),act=None)
+                l.append(tt)
+            fusedSingleClsPred = tf.concat(l,axis=-1)                                                               #=>
+            fusedMultiClsPred  = ConvLayer(tf.nn.relu(fusedSingleClsPred),5,5,5,5,training=trainingFlag,name='MultiInfer',act=None)                            #=>
+        return lev1,lev2,lev3,lev4,fusedSingleClsPred,fusedMultiClsPred
+
+def maskLogitsLoss(mask,logits):
+    '''
+
+    :param mask: [:,224,224,X]
+    :param logits: [:,224,224,5]
+    :return:
+    '''
+    lossMtrx = tf.nn.sigmoid_cross_entropy_with_logits(logits=logits,labels=mask)
+    return tf.reduce_mean(lossMtrx)
+
+
+def multiMaskLoss(mask,logits):
+    '''
+
+    :param mask: [:,224,224,X]
+    :param logits: [:,224,224,5]
+    :return:
+    '''
+    lossMtrx = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=mask,dim=-1)
+    return tf.reduce_mean(lossMtrx)
+
+
+def lossVGGMaskLoss(lev1,lev2,lev3,lev4,fusedSingleClsPred,fusedMultiClsPred,gtMask):
+
+    lossLoev1 = maskLogitsLoss(gtMask,lev1) # focal`
+    lossLoev2 = maskLogitsLoss(gtMask,lev2)
+    lossLoev3 = maskLogitsLoss(gtMask,lev3)
+    lossLoev4 = maskLogitsLoss(gtMask,lev4)
+    lossFusedSingleClsPred = maskLogitsLoss(gtMask,fusedSingleClsPred)
+    lossFusedMultiClsPred = multiMaskLoss(gtMask,fusedMultiClsPred)
+
+
+    ##
+    a = fusedSingleClsPred[:, :, :, 1]
+    a = tf.cast((tf.sigmoid(a) > 0.5),tf.float32)
+    b = tf.argmax(fusedMultiClsPred,axis=-1)
+    b = tf.cast(b == 1,tf.float32)
+    iou1 = IOU(a, gtMask[:, :, :, 1])
+    iou2 = IOU(b, gtMask[:, :, :, 1])
+
+
+    tf.summary.scalar('IOU single pred', iou1)
+    tf.summary.scalar('IOU multi pred', iou2)
+
+    tf.summary.image('single pred channel',tf.expand_dims(fusedSingleClsPred[:,:,:,1],axis=-1))
+    tf.summary.image('multi pred channel',tf.expand_dims(fusedMultiClsPred[:,:,:,1],axis=-1))
+    tf.summary.image('single pred ',tf.expand_dims(tf.cast(fusedSingleClsPred[:,:,:,1]>0.5,tf.float32),axis=-1))
+    tf.summary.image('multi pred ',tf.expand_dims(tf.cast(fusedMultiClsPred[:,:,:,1]>0.5,tf.float32),axis=-1))
+
+    loss = lossLoev1 + lossLoev2 + lossLoev3 + lossLoev4 + lossFusedSingleClsPred + lossFusedMultiClsPred
+    tf.summary.scalar('Loss', loss)
+    return loss,(iou1+iou2)/2
+
+
+
+
+
+
+
+
 
 
 def main():
@@ -1089,24 +1230,15 @@ def main():
         gtLb = tf.clip_by_value(tf.random_normal([5, conf.FIANL_CLASSES_NUM]), 0, 1)
 
         ## 如何外部调用
-        logits_28, logits_56, logits_112, logits_224, logitsClass = LjchCNN(x, f)
-        loss = lossFunc(logits_28, logits_56, logits_112, logits_224, logitsClass, gtImg, gtLb)
+        a = VGG16MASK(x, True)
+        #loss = lossFunc(logits_28, logits_56, logits_112, logits_224, logitsClass, gtImg, gtLb)
         initOpt = tf.global_variables_initializer()
 
     # 打开session开始计算
     with tf.Session(graph=g) as sess:
         sess.run([initOpt])
-
-        vgg_var_list = tf.global_variables('resnet_v2_50')
-        vgg_var_list = vgg_var_list[:-2]
-        saver = tf.train.Saver(vgg_var_list)
-        saver.restore(sess, 'model/resnet_v2_50.ckpt')
-
-        in0 = np.clip(np.random.random([5, 224, 224, 3]), 0, 1)
-        writer = tf.summary.FileWriter('log', sess.graph)
-        vvx = tf.Variable(0)
-        loss_ = sess.run(loss, feed_dict={x: in0, f: True})
-        print(loss_)
+        aa = sess.run([a],feed_dict={x:np.random.rand(3,224,224,3)})
+        f = 3
 
 
 if __name__ == '__main__':
