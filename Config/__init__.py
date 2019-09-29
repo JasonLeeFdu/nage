@@ -32,6 +32,8 @@ PRETRAIN_DECAY_RATE =  0
 PRETRAIN_SCOPE = 'resnet_v2_50'                 #'saliency'      #'VGG19CLS'  #'resnet_v2_50'
 ## 微调保留层数
 RESERVE_LEVEL = 4
+## 进行模型参数的偷偷保留
+STEALTH_MODE_MODEL_ON = True
 
 
 '''################################################################################################
@@ -40,7 +42,7 @@ RESERVE_LEVEL = 4
 #################################################################################################
 '''
 ## 学习率
-LR = 1e-3#3
+LR = 1e-4#3
 ## 学习率下降间隔
 LR_INTERVAL = 2000
 ## 学习率下降的比率
@@ -51,11 +53,7 @@ WEIGHT_DECAY= 0#0.000000
 BATCH_SIZE = 8
 ## 批训练大小，测试
 VALTEST_BATCHSIZE = 24
-## 梯度剪切
-#GRADIENT_CLIP_THETA = 0.1
-## 权重初始化参数
-#WEIGHT_INIT_STDDEV_FACTOR = 0.1
-#WEIGHT_INIT_MEAN_FACTOR = 0
+
 ## 训练是按照Epoch，还是ITers
 TRAIN_EPOCH_OR_ITERS = 'epoch'              # 'epoch','iter'
 ## 加载模型所用的线程数
@@ -67,7 +65,11 @@ MAX_ITERATIONS = 65000
 ## 冲量
 #MOMENTUM = 0.9
 
-
+## 梯度剪切
+#GRADIENT_CLIP_THETA = 0.1
+## 权重初始化参数
+#WEIGHT_INIT_STDDEV_FACTOR = 0.1
+#WEIGHT_INIT_MEAN_FACTOR = 0
 '''################################################################################################
                                     路径配置
 
@@ -85,7 +87,7 @@ PRETRAINED_Resnet50 = os.path.join(_PROJECT_BASEPATH,'/pretrainedMod/resnet_v2_5
 PRETRAINED_VGG19NPY = os.path.join(_PROJECT_BASEPATH,'/pretrainedMod/vgg16.npy')
 MODEL_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','model') % MODEL_Name
 LOG_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','log') % MODEL_Name
-
+STEALTH_MODE_MODEL_PATH = os.path.join(_PROJECT_BASEPATH,'Model','Neijing_%s','snapshots') % MODEL_Name
 
 
 # 网络结构
@@ -114,6 +116,9 @@ PRINT_INTERVAL = 50
 SAVE_INTERVAL = 1000
 SUMMARY_INTERVAL = 50
 VALIDATION_INTERVAL = 500
+STEALTH_INTERVAL = 1000
+
+
 GPU_FLAG = True
 GPUS = 0
 SEED = random.randint(1, 900000)
